@@ -555,7 +555,7 @@ Return ONLY valid JSON:
     const psScores = [
       { label: "Performance", score: psData.performance, avg: 58, top: 71 },
       { label: "Accessibility", score: psData.accessibility, avg: 72, top: 84 },
-      { label: "Conversion Optimization", score: psData.bestPractices, avg: 61, top: 74 },
+      { label: "Conversion Optimization", score: psData.bestPractices, avg: 73, top: 87 },
       { label: "SEO", score: psData.seo, avg: 68, top: 79 },
     ];
     const blkGap = 12;
@@ -976,7 +976,7 @@ Return ONLY valid JSON:
                         {[
                           {key:"performance",label:"Performance",avg:58,top:71},
                           {key:"accessibility",label:"Accessibility",avg:72,top:84},
-                          {key:"bestPractices",label:"Conversion Optimization",avg:61,top:74},
+                          {key:"bestPractices",label:"Conversion Optimization",avg:73,top:87},
                           {key:"seo",label:"SEO",avg:68,top:79},
                         ].map(g=>(
                           <div key={g.key} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
