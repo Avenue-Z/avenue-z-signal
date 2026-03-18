@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import Groq from "groq-sdk";
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!process.env.GROQ_API_KEY) {
     return NextResponse.json(
-      { error: "ANTHROPIC_API_KEY is not configured" },
+      { error: "GROQ_API_KEY is not configured" },
       { status: 500 }
     );
   }
@@ -12,21 +14,34 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
+    const messages = body.messages?.map((m: { role: string; content: string }) => ({
+      role: m.role,
+      content: m.content,
+    })) || [];
+
+    if (body.system) {
+      messages.unshift({ role: "system", content: body.system });
+    }
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages,
+      max_tokens: body.max_tokens || 4096,
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      return NextResponse.json(data, { status: res.status });
-    }
+    const data = {
+      id: completion.id,
+      type: "message",
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: completion.choices[0]?.message?.content || "",
+        },
+      ],
+      model: "llama-3.3-70b-versatile",
+      stop_reason: completion.choices[0]?.finish_reason || "end_turn",
+    };
 
     return NextResponse.json(data);
   } catch (e: unknown) {

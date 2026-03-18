@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Avenue Z Signal",
-  description: "AI CMO — Website Analysis & Marketing Intelligence",
+  title: "Conversion Intelligence",
+  description: "Conversion Intelligence — Website Analysis & Marketing Intelligence",
 };
 
 export default function RootLayout({

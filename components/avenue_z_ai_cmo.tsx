@@ -215,9 +215,9 @@ Then return ONLY valid JSON (absolutely no markdown fences, no explanation):
 
       // STAGE 3: Recommendations + PageSpeed estimates if needed
       setStage(3);
-      log("> Generating AI CMO recommendations...");
+      log("> Generating Conversion Intelligence recommendations...");
 
-      const recsPrompt=`You are the AI CMO at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, paid search, TikTok Shop, affiliate, CRO), Earned Media (PR, comms, crisis, thought leadership), Owned Media (AEO/AI Search, SEO, Shopify, brand content).
+      const recsPrompt=`You are the Conversion Intelligence engine at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, paid search, TikTok Shop, affiliate, CRO), Earned Media (PR, comms, crisis, thought leadership), Owned Media (AEO/AI Search, SEO, Shopify, brand content).
 
 Based on this actual website analysis, generate 5 high-impact, specific marketing recommendations. Be concrete — reference actual things you found on the site.
 
@@ -238,7 +238,7 @@ Return ONLY valid JSON:
 {
   ${!ps?`"pageSpeed":{"performance":0,"accessibility":0,"bestPractices":0,"seo":0,"lcp":"","fcp":"","tbt":"","cls":""},`:""}
   "recommendations":[
-    {"category":"SEO"|"AEO"|"Content"|"Technical"|"Performance Media"|"PR","title":"specific actionable title","severity":"critical"|"warning"|"opportunity","description":"specific issue found on this actual site","fix":"concrete action referencing Avenue Z services","impact":"high"|"medium"|"low"}
+    {"category":"SEO"|"AEO"|"Content"|"Technical"|"Performance Media"|"PR","title":"specific actionable title","severity":"critical"|"warning"|"opportunity","description":"specific problem found on this actual site that Avenue Z can solve","fix":"concrete action Avenue Z's team will implement — frame as what Avenue Z does, not what a tool does","impact":"high"|"medium"|"low"}
   ]
 }`;
 
@@ -257,17 +257,36 @@ Return ONLY valid JSON:
 
       const geoPrompt=`You are an AEO (Answer Engine Optimization) expert at Avenue Z, the #1 AI Search Agency. Analyze ${u} (${sd.companyName} — ${sd.description}) for AI search visibility.
 
-Assess how this site performs in AI-powered search engines based on their actual content, authority, and structure.
+Use this EXACT weighted methodology to calculate the overall AI/GEO Visibility Score (0-100):
+
+1. Structured Data / Schema Markup (20 pts): Full schema present = 20, partial = 10, none = 0. Site has schema: ${sd.hasSchema}
+2. Content Structure for AI Retrieval (20 pts): Evaluate presence of FAQs, clear H2 structure (found ${sd.h2Count} H2s), conversational content, answer-formatted writing. Score 0-20 based on how citable this content is to an AI engine.
+3. Technical Accessibility via PageSpeed (15 pts): Map the PageSpeed accessibility score (${ps?.accessibility??'N/A'}/100) proportionally to 0-15.
+4. Security and Mobile Readiness (15 pts): HTTPS = 8pts (site has HTTPS: ${sd.https}), Mobile viewport = 7pts (site is mobile responsive: ${sd.mobileResponsive}).
+5. Brand Authority and EAT Signals (15 pts): Evaluate expertise, authoritativeness, trustworthiness signals — team pages, press mentions, about page depth, credentials, client logos. Score 0-15 based on what you find.
+6. Content Depth and Substance (15 pts): Evaluate whether the site has enough substantive original content for an AI engine to pull a meaningful cited answer from. Score 0-15.
+
+The overallScore MUST equal the sum of these 6 component scores. Show your work in the breakdown.
+
+Per-engine scores: derive each from the overallScore, adjusted by up to ±15 points based on each engine's weighting:
+- ChatGPT: weights brand authority and content depth most heavily
+- Perplexity: weights structured data and technical accessibility most heavily
+- Google Gemini: weights mobile readiness, HTTPS, and schema most heavily
+- Claude: weights content quality and EAT signals most heavily
+- Bing Copilot: weights technical SEO signals and structured data most heavily
+
+Each engine note MUST be one specific sentence tied to what was actually found on the site.
 
 Return ONLY valid JSON:
 {
   "overallScore":number,
+  "scoreBreakdown":{"structuredData":number,"contentStructure":number,"technicalAccessibility":number,"securityMobile":number,"brandAuthority":number,"contentDepth":number},
   "aiEngines":[
-    {"name":"ChatGPT","score":number,"status":"strong"|"moderate"|"weak","note":"specific reason based on this site"},
-    {"name":"Perplexity","score":number,"status":"strong"|"moderate"|"weak","note":"specific reason"},
-    {"name":"Google Gemini","score":number,"status":"strong"|"moderate"|"weak","note":"specific reason"},
-    {"name":"Claude","score":number,"status":"strong"|"moderate"|"weak","note":"specific reason"},
-    {"name":"Bing Copilot","score":number,"status":"strong"|"moderate"|"weak","note":"specific reason"}
+    {"name":"ChatGPT","score":number,"status":"strong"|"moderate"|"weak","note":"one specific sentence about this site"},
+    {"name":"Perplexity","score":number,"status":"strong"|"moderate"|"weak","note":"one specific sentence about this site"},
+    {"name":"Google Gemini","score":number,"status":"strong"|"moderate"|"weak","note":"one specific sentence about this site"},
+    {"name":"Claude","score":number,"status":"strong"|"moderate"|"weak","note":"one specific sentence about this site"},
+    {"name":"Bing Copilot","score":number,"status":"strong"|"moderate"|"weak","note":"one specific sentence about this site"}
   ],
   "signals":[
     {"label":"Knowledge Graph Presence","passed":true/false,"detail":"specific note"},
@@ -278,7 +297,7 @@ Return ONLY valid JSON:
     {"label":"Citation Worthiness","passed":true/false,"detail":"specific note"}
   ],
   "topOpportunities":[
-    {"title":"specific opportunity","description":"concrete action for this site","priority":"high"|"medium"}
+    {"title":"specific opportunity","description":"concrete action Avenue Z can implement for this site","priority":"high"|"medium"}
   ]
 }`;
 
@@ -301,7 +320,7 @@ Return ONLY valid JSON:
     setChatLoading(true);
     try{
       const ctx=siteData?`Analyzed site: ${siteData.url} | Company: ${siteData.companyName} | ${siteData.description} | PageSpeed: Perf ${psData?.performance??'N/A'}, SEO ${psData?.seo??'N/A'} | HTTPS: ${siteData.https}, Mobile: ${siteData.mobileResponsive}, Schema: ${siteData.hasSchema} | H1s: ${siteData.h1Tags}, Images: ${siteData.totalImages} (${siteData.missingAlt} missing alt) | Links: ${siteData.internalLinks} int, ${siteData.externalLinks} ext | AI/GEO Score: ${geoData?.overallScore??'N/A'}/100`:"No site analyzed yet.";
-      const sys=`You are the AI CMO at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, TikTok Shop, paid search, CRO, affiliate), Earned Media (PR, crisis comms, thought leadership), Owned Media (AEO, SEO, Shopify dev, content). Be concise, strategic, specific. Always connect advice to Avenue Z capabilities.\n\nCurrent analysis context: ${ctx}`;
+      const sys=`You are the Conversion Intelligence engine at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, TikTok Shop, paid search, CRO, affiliate), Earned Media (PR, crisis comms, thought leadership), Owned Media (AEO, SEO, Shopify dev, content). Be concise, strategic, specific. Always connect advice to Avenue Z capabilities.\n\nCurrent analysis context: ${ctx}`;
       const history=chat.map(m=>({role:m.role,content:m.content}));
       const text=await callClaude([...history,{role:"user",content:msg}],sys,800);
       setChat(p=>[...p,{role:"assistant",content:text}]);
@@ -335,7 +354,7 @@ Return ONLY valid JSON:
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <span className="gt" style={{fontSize:17,fontWeight:900,letterSpacing:"-0.3px"}}>AVENUE Z</span>
             <span style={{color:"#ffffff20"}}>|</span>
-            <span style={{color:"#555",fontSize:12,fontWeight:700,letterSpacing:"0.04em"}}>SIGNAL</span>
+            <span style={{color:"#555",fontSize:12,fontWeight:700,letterSpacing:"0.04em"}}>CONVERSION INTELLIGENCE</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             {Object.values(AVENUE_Z.stats).map((v,i)=>(
@@ -352,7 +371,7 @@ Return ONLY valid JSON:
         <div ref={logRef} style={{background:"#000",borderBottom:"1px solid #60FF8022",padding:"0 16px",height:36,display:"flex",alignItems:"center",gap:8,overflowX:"auto",flexShrink:0,whiteSpace:"nowrap"}}>
           <Terminal size={12} color="#60FF80" style={{flexShrink:0}}/>
           {logs.length===0
-            ?      <span style={{color:"#60FF8044",fontFamily:"monospace",fontSize:11}}>Avenue Z Signal — Ready. Enter a URL to begin.</span>
+            ?      <span style={{color:"#60FF8044",fontFamily:"monospace",fontSize:11}}>Conversion Intelligence — Ready. Enter a URL to begin.</span>
             :logs.map((l,i)=><span key={i} style={{color:"#60FF80",fontFamily:"monospace",fontSize:11,marginRight:14}}>
               {l}{i===logs.length-1&&<span className="blink">_</span>}
             </span>)}
@@ -618,6 +637,7 @@ Return ONLY valid JSON:
                             {geoData.overallScore>=80?"Strong Presence":geoData.overallScore>=60?"Moderate Presence":geoData.overallScore>=40?"Developing":"Needs Improvement"}
                           </div>
                           <div style={{color:"#555",fontSize:11}}>ChatGPT · Perplexity · Gemini · Claude · Copilot</div>
+                          <div style={{color:"#44444488",fontSize:9,marginTop:8,lineHeight:1.5,fontStyle:"italic"}}>Scores are data-informed predictions based on real site signals. Not live AI engine queries.</div>
                         </div>
                       </div>
 
@@ -648,7 +668,7 @@ Return ONLY valid JSON:
                       </div>
 
                       <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20,marginBottom:14}}>
-                        <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:12}}>AEO READINESS SIGNALS</div>
+                        <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:12}}>AEO READINESS INDICATORS</div>
                         {geoData.signals.map((s,i)=>(
                           <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<geoData.signals.length-1?"1px solid #ffffff07":"none"}}>
                             <div style={{width:20,height:20,borderRadius:"50%",background:s.passed?"#0f2d18":"#3d1515",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -702,7 +722,7 @@ Return ONLY valid JSON:
             {/* Recs — 55% height */}
             <div style={{flex:"0 0 55%",overflowY:"auto",padding:14,borderBottom:"1px solid #ffffff08"}}>
               <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
-                <Zap size={11} color="#FFFC60"/> SIGNAL FEED
+                <Zap size={11} color="#FFFC60"/> CONVERSION INTELLIGENCE FEED
               </div>
               {loading&&recs.length===0?(
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -729,9 +749,17 @@ Return ONLY valid JSON:
                             <div style={{color:"#60FF80",fontSize:9,fontWeight:800,letterSpacing:"0.1em",marginBottom:5}}>RECOMMENDED ACTION</div>
                             <p style={{color:"#ccc",fontSize:12,lineHeight:1.6,margin:0}}>{rec.fix}</p>
                           </div>
-                          <span style={{color:rec.impact==="high"?"#60FF80":rec.impact==="medium"?"#FFFC60":"#777",fontSize:11,fontWeight:700,textTransform:"uppercase"}}>
-                            {rec.impact} impact
-                          </span>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:4}}>
+                            <span style={{color:rec.impact==="high"?"#60FF80":rec.impact==="medium"?"#FFFC60":"#777",fontSize:11,fontWeight:700,textTransform:"uppercase"}}>
+                              {rec.impact} impact
+                            </span>
+                            {(rec.severity==="critical"||rec.severity==="warning")&&(
+                              <a href="https://avenuez.com/contact" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                                style={{display:"inline-flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#39A0FF,#6034FF)",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 12px",borderRadius:99,textDecoration:"none",letterSpacing:"0.03em",transition:"opacity 0.2s",cursor:"pointer"}}>
+                                Contact Avenue Z <ExternalLink size={9}/>
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -749,7 +777,7 @@ Return ONLY valid JSON:
             <div style={{flex:"0 0 45%",display:"flex",flexDirection:"column",minHeight:0}}>
               <div style={{padding:"10px 14px",borderBottom:"1px solid #ffffff07",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                 <MessageSquare size={11} color="#39A0FF"/>
-                <span style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>CHAT WITH SIGNAL</span>
+                <span style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>CHAT WITH CONVERSION INTELLIGENCE</span>
               </div>
               <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
                 {chat.length===0&&(
@@ -760,7 +788,7 @@ Return ONLY valid JSON:
                 {chat.map((m,i)=>(
                   <div key={i} className="fi" style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
                     <div style={{maxWidth:"88%",background:m.role==="user"?"#1e1e1e":"#141414",border:`1px solid ${m.role==="user"?"#ffffff0f":"#39A0FF18"}`,borderRadius:m.role==="user"?"12px 12px 4px 12px":"12px 12px 12px 4px",padding:"10px 13px",fontSize:12,color:m.role==="user"?"#ddd":"#bbb",lineHeight:1.6}}>
-                      {m.role==="assistant"&&<div style={{color:"#39A0FF",fontSize:9,fontWeight:800,letterSpacing:"0.1em",marginBottom:5}}>AI CMO</div>}
+                      {m.role==="assistant"&&<div style={{color:"#39A0FF",fontSize:9,fontWeight:800,letterSpacing:"0.1em",marginBottom:5}}>Conversion Intelligence</div>}
                       {m.content}
                     </div>
                   </div>
@@ -768,7 +796,7 @@ Return ONLY valid JSON:
                 {chatLoading&&(
                   <div style={{display:"flex",justifyContent:"flex-start"}}>
                     <div style={{background:"#141414",border:"1px solid #39A0FF18",borderRadius:"12px 12px 12px 4px",padding:"10px 14px"}}>
-                      <div style={{color:"#39A0FF",fontSize:9,fontWeight:800,letterSpacing:"0.1em",marginBottom:5}}>AI CMO</div>
+                      <div style={{color:"#39A0FF",fontSize:9,fontWeight:800,letterSpacing:"0.1em",marginBottom:5}}>Conversion Intelligence</div>
                       <div style={{display:"flex",gap:4}}>
                         {[0,1,2].map(i=><div key={i} style={{width:5,height:5,borderRadius:"50%",background:"#39A0FF",animation:`bl ${0.8+i*0.15}s step-end infinite`}}/>)}
                       </div>
@@ -779,7 +807,7 @@ Return ONLY valid JSON:
               <div style={{padding:"10px 14px 14px",flexShrink:0}}>
                 <div style={{display:"flex",gap:8,background:"#111",border:"1px solid #ffffff12",borderRadius:12,padding:"8px 8px 8px 14px",alignItems:"flex-end"}}>
                   <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendChat()}
-                    placeholder="Ask the AI CMO anything…"
+                    placeholder="Ask Conversion Intelligence anything…"
                     style={{flex:1,background:"none",border:"none",color:"#ddd",fontSize:12,outline:"none",resize:"none",lineHeight:1.5}}/>
                   <button onClick={sendChat} disabled={chatLoading||!chatIn.trim()}
                     style={{width:32,height:32,borderRadius:8,border:"none",cursor:chatLoading||!chatIn.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",background:chatLoading||!chatIn.trim()?"#1e1e1e":"linear-gradient(135deg,#FFFC60,#60FF80)",flexShrink:0}}>
