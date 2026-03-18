@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, ChevronDown, ChevronRight, ExternalLink, Check, X, Loader2, Terminal, MessageSquare, Globe, Search, Zap, TrendingUp } from "lucide-react";
+import { Send, ChevronDown, ChevronRight, ExternalLink, Check, X, Loader2, Terminal, MessageSquare, Globe, Search, Zap, TrendingUp, Download } from "lucide-react";
+import jsPDF from "jspdf";
 
 const AVENUE_Z = {
   stats: { commerceDriven: "$1B+", transactionsRepresented: "$38B", techPartnerships: "60+", ranking: "#1 Top AI Search Agency" },
@@ -36,11 +37,12 @@ function Gauge({ score, label, size=90 }) {
   );
 }
 
-function VitalCard({ label, value }) {
+function VitalCard({ label, value, fullName }: { label: any; value: any; fullName?: string }) {
   return (
     <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px 10px",textAlign:"center",border:"1px solid #ffffff08",minWidth:0,overflow:"hidden"}}>
       <div style={{color:"#FFFC60",fontSize:16,fontWeight:800,lineHeight:1,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{value||"—"}</div>
-      <div style={{color:"#555",fontSize:10,lineHeight:1.5,fontWeight:600}}>{label}</div>
+      <div style={{color:"#555",fontSize:11,lineHeight:1.3,fontWeight:700}}>{label}</div>
+      {fullName&&<div style={{color:"#8A8A8A",fontSize:10,lineHeight:1.3,marginTop:2}}>{fullName}</div>}
     </div>
   );
 }
@@ -54,7 +56,7 @@ function Badge({ severity }) {
 function CatTag({ category }) {
   const c={SEO:"#39A0FF",AEO:"#6034FF",Content:"#60FDFF",Technical:"#FFFC60","Performance Media":"#60FF80",PR:"#FF6060"};
   const col=c[category]||"#8A8A8A";
-  return <span style={{background:`${col}18`,color:col,fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,border:`1px solid ${col}33`,flexShrink:0}}>{category}</span>;
+  return <span style={{background:`${col}18`,color:col,fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,border:`1px solid ${col}33`,flexShrink:0,display:"inline-block",lineHeight:"normal",whiteSpace:"nowrap"}}>{category||"General"}</span>;
 }
 
 function ChkItem({ label, passed, detail }: { label: any; passed: any; detail?: any }) {
@@ -132,7 +134,65 @@ export default function App() {
       setStage(1);
       log(`> Initiating live web analysis of ${u}...`);
 
-      const sitePrompt=`You are an expert SEO and marketing analyst. Use your web search tool to visit and thoroughly analyze this website: ${u}
+      // Scrape site with Firecrawl first for real content
+      let scrapedMarkdown = "";
+      let scrapedMeta: any = {};
+      try {
+        log(`> Scraping site content via Firecrawl...`);
+        const fcRes = await fetch("/api/firecrawl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: u, formats: ["markdown"] }),
+        });
+        if (fcRes.ok) {
+          const fcData = await fcRes.json();
+          scrapedMarkdown = fcData.data?.markdown || "";
+          scrapedMeta = fcData.data?.metadata || {};
+          if (scrapedMarkdown) log(`> Firecrawl scraped ${scrapedMarkdown.length} chars of content.`);
+        }
+      } catch (e) {
+        log(`> Firecrawl unavailable — falling back to web search.`);
+      }
+
+      const hasScrapedContent = scrapedMarkdown.length > 100;
+      const scrapedContext = hasScrapedContent ? `
+Here is the actual scraped content from the site — use ONLY this to describe the company, do not use your training data:
+
+SCRAPED METADATA:
+- Title: ${scrapedMeta.title || "N/A"}
+- Description: ${scrapedMeta.description || "N/A"}
+- OG Title: ${scrapedMeta.ogTitle || scrapedMeta["og:title"] || "N/A"}
+
+SCRAPED PAGE CONTENT (first 6000 chars):
+${scrapedMarkdown.slice(0, 6000)}
+` : "";
+
+      const sitePrompt=hasScrapedContent
+        ? `You are an expert SEO and marketing analyst. Analyze this website: ${u}
+${scrapedContext}
+Based ONLY on the scraped content above, return ONLY valid JSON (absolutely no markdown fences, no explanation):
+{
+  "companyName": "actual company name from the scraped content",
+  "description": "2-3 sentence description of what this company actually does based on the scraped content above",
+  "industry": "their specific industry/vertical based on the scraped content",
+  "titleTag": "the actual page title tag text from metadata",
+  "titleLength": number,
+  "metaDescription": "the actual meta description text from metadata or empty string if missing",
+  "metaDescriptionLength": number,
+  "hasHttps": true/false,
+  "hasMobileViewport": true/false,
+  "hasStructuredData": true/false,
+  "h1Count": number,
+  "h2Count": number,
+  "estimatedImages": number,
+  "estimatedMissingAlt": number,
+  "estimatedInternalLinks": number,
+  "estimatedExternalLinks": number,
+  "keyPages": ["list of main nav pages you found in the content"],
+  "primaryCTA": "what is their main call to action based on the scraped content",
+  "contentQuality": "brief honest assessment of their content quality and depth based on the scraped content"
+}`
+        : `You are an expert SEO and marketing analyst. Use your web search tool to visit and thoroughly analyze this website: ${u}
 
 Search for and visit the actual URL. Examine the live page content, meta tags, structure, and any available technical signals.
 
@@ -159,7 +219,7 @@ Then return ONLY valid JSON (absolutely no markdown fences, no explanation):
   "contentQuality": "brief honest assessment of their content quality and depth"
 }`;
 
-      const siteText=await callClaude([{role:"user",content:sitePrompt}],null,2000,true);
+      const siteText=await callClaude([{role:"user",content:sitePrompt}],null,2000,!hasScrapedContent);
       const siteInfo=safeParseJSON(siteText);
       const sd={
         url:u,
@@ -345,6 +405,393 @@ Return ONLY valid JSON:
     psData?.accessibility>=90&&{label:"Accessibility Score 90+",detail:psData.accessibility},
   ].filter(Boolean):[];
 
+  const analysisComplete = !!(siteData && psData && recs.length > 0 && geoData);
+
+  const generatePDF = () => {
+    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 40; // margin
+    const CW = W - M * 2; // content width
+    const P = 16; // card internal padding
+    const GAP = 20; // gap between sections
+    const TW = CW - P * 2; // text width inside cards (full width minus padding both sides)
+    let y = 0;
+    let pageNum = 1;
+
+    // Colors
+    const BG = "#000000", CARD = "#272727", WHITE = "#FFFFFF", MUTED = "#8A8A8A";
+    const GREEN = "#60FF80", YELLOW = "#FFFC60", RED = "#FF6060";
+    const CYAN = "#60FDFF", BLUE = "#39A0FF", PURPLE = "#6034FF";
+    const GRAD = ["#FFFC60", "#60FF80", "#60FDFF", "#39A0FF", "#6034FF"];
+
+    const hex = (h: string): [number, number, number] => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+    const tCol = (h: string) => { doc.setTextColor(...hex(h)); };
+    const fCol = (h: string) => { doc.setFillColor(...hex(h)); };
+
+    const drawPageNum = () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      tCol(MUTED);
+      doc.text(`Page ${pageNum}`, W - M, H - 24, { align: "right" });
+    };
+
+    const drawGradientBar = (bx: number, by: number, bw: number, bh: number) => {
+      const segW = bw / 5;
+      GRAD.forEach((c, i) => { fCol(c); doc.rect(bx + i * segW, by, segW, bh, "F"); });
+    };
+
+    const newPage = () => {
+      drawPageNum();
+      doc.addPage();
+      pageNum++;
+      fCol(BG); doc.rect(0, 0, W, H, "F");
+      y = M;
+    };
+
+    const checkSpace = (needed: number) => { if (y + needed > H - 60) newPage(); };
+
+    const card = (cx: number, cy: number, cw: number, ch: number) => {
+      fCol(CARD); doc.roundedRect(cx, cy, cw, ch, 8, 8, "F");
+    };
+
+    const sectionLabel = (title: string, ly: number) => {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); tCol(MUTED);
+      doc.text(title, M + P, ly + 12);
+    };
+
+    const scoreCol = (s: number) => s >= 90 ? GREEN : s >= 50 ? YELLOW : RED;
+
+    const textHeight = (text: string, fontSize: number, maxW: number, font = "normal") => {
+      doc.setFont("helvetica", font); doc.setFontSize(fontSize);
+      return doc.splitTextToSize(text, maxW).length * fontSize * 1.3;
+    };
+
+    // ═══════════════ PAGE 1: HEADER ═══════════════
+    fCol(BG); doc.rect(0, 0, W, H, "F");
+    y = M;
+
+    // Logo
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20); tCol(WHITE);
+    doc.text("AVENUE Z", M, y);
+    const lw = doc.getTextWidth("AVENUE Z");
+    tCol(MUTED); doc.text("  |  ", M + lw, y);
+    const sw = doc.getTextWidth("  |  ");
+    doc.setFontSize(10); tCol(MUTED);
+    doc.text("CONVERSION INTELLIGENCE", M + lw + sw, y);
+    y += 10;
+
+    // Gradient bar
+    drawGradientBar(M, y, CW, 4);
+    y += 20;
+
+    // Date + URL
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); tCol(MUTED);
+    doc.text(`Report Date: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, M, y);
+    y += 16;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); tCol(WHITE);
+    doc.text(`URL Analyzed: ${siteData.url}`, M, y);
+    y += GAP + 10;
+
+    // ═══════════════ COMPANY PROFILE ═══════════════
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+    const descText = siteData.description || "N/A";
+    const descWrapped = doc.splitTextToSize(descText, TW);
+    const descH = descWrapped.length * 12;
+    const cpH = P + 22 + 18 + descH + 10 + 20 + P;
+    checkSpace(cpH);
+    const cpStart = y;
+    card(M, y, CW, cpH);
+    sectionLabel("COMPANY PROFILE", y);
+    y += P + 22;
+
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); tCol(WHITE);
+    doc.text(siteData.companyName, M + P, y);
+    y += 18;
+
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); tCol(MUTED);
+    doc.text(descWrapped, M + P, y);
+    y += descH + 10;
+
+    // Industry + HTTPS badges
+    if (siteData.industry) {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      fCol("#1a3a5a");
+      const indW = doc.getTextWidth(siteData.industry) + 16;
+      doc.roundedRect(M + P, y - 4, indW, 16, 8, 8, "F");
+      tCol(BLUE); doc.text(siteData.industry, M + P + 8, y + 7);
+
+      const hx = M + P + indW + 8;
+      fCol(siteData.https ? "#0f2d18" : "#3d1515");
+      const hLabel = siteData.https ? "HTTPS" : "HTTP";
+      const hW = doc.getTextWidth(hLabel) + 16;
+      doc.roundedRect(hx, y - 4, hW, 16, 8, 8, "F");
+      tCol(siteData.https ? GREEN : RED); doc.text(hLabel, hx + 8, y + 7);
+    }
+    y = cpStart + cpH + GAP;
+
+    // ═══════════════ PAGESPEED SCORES ═══════════════
+    const psCardH = P + 22 + 70 + 16 + P;
+    checkSpace(psCardH);
+    const psStart = y;
+    card(M, y, CW, psCardH);
+    sectionLabel("PAGESPEED SCORES", y);
+
+    // Live/estimated label on right
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    tCol(psData.live ? GREEN : YELLOW);
+    doc.text(psData.live ? "LIVE DATA" : "AI ESTIMATED", M + CW - P, y + 12, { align: "right" });
+
+    y += P + 22;
+
+    const psScores = [
+      { label: "Performance", score: psData.performance },
+      { label: "Accessibility", score: psData.accessibility },
+      { label: "Best Practices", score: psData.bestPractices },
+      { label: "SEO", score: psData.seo },
+    ];
+    const blkGap = 12;
+    const blkW = (TW - blkGap * 3) / 4;
+    const blkH = 70;
+    psScores.forEach((s, i) => {
+      const bx = M + P + i * (blkW + blkGap);
+      const by = y;
+      // Colored block background
+      fCol(scoreCol(s.score));
+      doc.roundedRect(bx, by, blkW, blkH, 6, 6, "F");
+      // Dark overlay for readability
+      fCol("#00000088");
+      doc.roundedRect(bx, by, blkW, blkH, 6, 6, "F");
+      // Score number centered at y+30
+      doc.setFont("helvetica", "bold"); doc.setFontSize(26);
+      tCol(scoreCol(s.score));
+      doc.text(String(s.score), bx + blkW / 2, by + 34, { align: "center" });
+      // Label centered at y+50
+      doc.setFontSize(8); tCol(WHITE);
+      doc.text(s.label, bx + blkW / 2, by + 54, { align: "center" });
+    });
+    y = psStart + psCardH + GAP;
+
+    // ═══════════════ CORE WEB VITALS ═══════════════
+    const cwvCardH = P + 22 + 50 + P;
+    checkSpace(cwvCardH);
+    const cwvStart = y;
+    card(M, y, CW, cwvCardH);
+    sectionLabel("CORE WEB VITALS", y);
+    y += P + 22;
+
+    const vitals = [
+      { label: "LCP", value: psData.lcp },
+      { label: "FCP", value: psData.fcp },
+      { label: "TBT", value: psData.tbt },
+      { label: "CLS", value: psData.cls },
+    ];
+    vitals.forEach((v, i) => {
+      const vx = M + P + i * (blkW + blkGap);
+      fCol("#1e1e1e");
+      doc.roundedRect(vx, y, blkW, 50, 6, 6, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+      tCol(YELLOW);
+      doc.text(String(v.value || "N/A"), vx + blkW / 2, y + 22, { align: "center" });
+      doc.setFontSize(8); tCol(MUTED);
+      doc.text(v.label, vx + blkW / 2, y + 38, { align: "center" });
+    });
+    y = cwvStart + cwvCardH + GAP;
+
+    // ═══════════════ SEO HEALTH CHECKLIST ═══════════════
+    const seoItems = [
+      { label: "Meta Title", passed: siteData.titleLength > 0, detail: siteData.titleLength > 0 ? `${siteData.titleLength} chars` : "Missing" },
+      { label: "Meta Description", passed: siteData.descriptionLength > 0, detail: siteData.descriptionLength > 0 ? `${siteData.descriptionLength} chars` : "Missing" },
+      { label: "HTTPS Secure", passed: siteData.https, detail: siteData.https ? "Secure" : "Not Secure" },
+      { label: "Mobile Responsive", passed: siteData.mobileResponsive, detail: siteData.mobileResponsive ? "Yes" : "No" },
+      { label: "Structured Data (Schema)", passed: siteData.hasSchema, detail: siteData.hasSchema ? "Present" : "Missing" },
+      { label: "H1 Tag Present", passed: siteData.h1Tags > 0, detail: siteData.h1Tags > 0 ? `${siteData.h1Tags} found` : "None" },
+      { label: "Image Alt Text", passed: siteData.missingAlt === 0, detail: siteData.missingAlt > 0 ? `${siteData.missingAlt} missing` : "All tagged" },
+    ];
+    const seoRowH = 24;
+    const seoCardH = P + 22 + seoItems.length * seoRowH + P;
+    checkSpace(seoCardH);
+    const seoStart = y;
+    card(M, y, CW, seoCardH);
+    sectionLabel("SEO HEALTH CHECKLIST", y);
+    let seoY = y + P + 22;
+
+    seoItems.forEach((item) => {
+      // PASS/FAIL text indicator (no unicode)
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      tCol(item.passed ? GREEN : RED);
+      doc.text(item.passed ? "PASS" : "FAIL", M + P, seoY + 4);
+
+      // Label
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); tCol(WHITE);
+      doc.text(item.label, M + P + 36, seoY + 4);
+
+      // Detail on right
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+      tCol(item.passed ? GREEN : RED);
+      doc.text(item.detail, M + CW - P, seoY + 4, { align: "right" });
+
+      seoY += seoRowH;
+    });
+    y = seoStart + seoCardH + GAP;
+
+    // ═══════════════ AI/GEO VISIBILITY SCORE ═══════════════
+    const geoScore = geoData.overallScore;
+    const geoCol = geoScore >= 70 ? GREEN : geoScore >= 45 ? YELLOW : RED;
+    const geoLabel = geoScore >= 80 ? "Strong Presence" : geoScore >= 60 ? "Moderate Presence" : geoScore >= 40 ? "Developing" : "Needs Improvement";
+    const geoCardH = P + 50 + P;
+    checkSpace(geoCardH);
+    const geoStart = y;
+    card(M, y, CW, geoCardH);
+    sectionLabel("AI / GEO VISIBILITY SCORE", y);
+    const geoInnerY = y + P + 22;
+
+    // Big score
+    doc.setFont("helvetica", "bold"); doc.setFontSize(32); tCol(geoCol);
+    doc.text(String(geoScore), M + P + 30, geoInnerY + 8, { align: "center" });
+    doc.setFontSize(11); tCol(MUTED);
+    doc.text("/100", M + P + 52, geoInnerY + 8);
+
+    // Status
+    doc.setFontSize(14); tCol(WHITE); doc.setFont("helvetica", "bold");
+    doc.text(geoLabel, M + P + 110, geoInnerY);
+    doc.setFontSize(9); tCol(MUTED); doc.setFont("helvetica", "normal");
+    doc.text("ChatGPT  |  Perplexity  |  Gemini  |  Claude  |  Copilot", M + P + 110, geoInnerY + 16);
+
+    y = geoStart + geoCardH + GAP;
+
+    // ═══════════════ PER-ENGINE BREAKDOWN ═══════════════
+    // Pre-calculate card height: measure all engine note lines
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    const engineRows = geoData.aiEngines.map((engine: any) => {
+      const noteWrapped = doc.splitTextToSize(engine.note || "", TW - 40);
+      const noteH = noteWrapped.length * 10;
+      return { engine, noteWrapped, rowH: 18 + noteH + 8 };
+    });
+    const engTotalH = engineRows.reduce((sum: number, r: any) => sum + r.rowH, 0);
+    const engCardH = P + 22 + engTotalH + P;
+    checkSpace(engCardH);
+    const engStart = y;
+    card(M, y, CW, engCardH);
+    sectionLabel("PER-ENGINE BREAKDOWN", y);
+    let engY = y + P + 22;
+
+    engineRows.forEach(({ engine, noteWrapped, rowH }: any) => {
+      const eCol = engine.status === "strong" ? GREEN : engine.status === "moderate" ? YELLOW : RED;
+
+      // Name
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); tCol(WHITE);
+      doc.text(engine.name, M + P, engY + 4);
+
+      // Score number
+      doc.setFontSize(11); tCol(eCol);
+      doc.text(String(engine.score), M + P + 120, engY + 4);
+
+      // Bar bg
+      const barX = M + P + 145;
+      const barMaxW = 160;
+      fCol("#1e1e1e"); doc.roundedRect(barX, engY - 3, barMaxW, 8, 4, 4, "F");
+      // Bar fill
+      fCol(eCol);
+      doc.roundedRect(barX, engY - 3, Math.max(4, (engine.score / 100) * barMaxW), 8, 4, 4, "F");
+
+      // Status badge
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+      const stTxt = engine.status.toUpperCase();
+      const stW = doc.getTextWidth(stTxt) + 12;
+      fCol(eCol + "22");
+      doc.roundedRect(M + CW - P - stW, engY - 5, stW, 14, 7, 7, "F");
+      tCol(eCol);
+      doc.text(stTxt, M + CW - P - stW / 2, engY + 4, { align: "center" });
+
+      engY += 18;
+
+      // Note (full wrap, no truncation)
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); tCol(MUTED);
+      doc.text(noteWrapped, M + P, engY);
+      engY += noteWrapped.length * 10 + 8;
+    });
+    y = engStart + engCardH + GAP;
+
+    // ═══════════════ RECOMMENDATIONS ═══════════════
+    recs.forEach((rec: any, i: number) => {
+      // Pre-measure all text for accurate card height
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      const descWrapped2 = doc.splitTextToSize(rec.description || "", TW);
+      const fixWrapped = doc.splitTextToSize(rec.fix || "", TW - 16);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+      const titleWrapped = doc.splitTextToSize(rec.title || "", TW);
+
+      const badgeRowH = 18;
+      const titleH = titleWrapped.length * 14;
+      const descH2 = descWrapped2.length * 12;
+      const fixLabelH = 14;
+      const fixTextH = fixWrapped.length * 12;
+      const fixBoxH = fixLabelH + fixTextH + 12;
+      const recCardH = P + (i === 0 ? 22 : 0) + badgeRowH + titleH + 6 + descH2 + 10 + fixBoxH + P;
+
+      checkSpace(recCardH);
+      const recStart = y;
+      card(M, y, CW, recCardH);
+
+      if (i === 0) { sectionLabel("RECOMMENDATIONS", y); }
+      let ry = y + P + (i === 0 ? 22 : 0);
+
+      // Severity badge
+      const sevMap: Record<string, { col: string; bg: string }> = {
+        critical: { col: RED, bg: "#3d1515" },
+        warning: { col: YELLOW, bg: "#3a2e00" },
+        opportunity: { col: GREEN, bg: "#0f2d18" },
+      };
+      const sev = sevMap[rec.severity] || sevMap.opportunity;
+      const sevTxt = (rec.severity || "opportunity").toUpperCase();
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+      const sevW = doc.getTextWidth(sevTxt) + 14;
+      fCol(sev.bg); doc.roundedRect(M + P, ry - 4, sevW, 14, 7, 7, "F");
+      tCol(sev.col); doc.text(sevTxt, M + P + 7, ry + 5);
+
+      ry += badgeRowH;
+
+      // Title
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); tCol(WHITE);
+      doc.text(titleWrapped, M + P, ry + 2);
+      ry += titleH + 6;
+
+      // Description (full wrap)
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); tCol(MUTED);
+      doc.text(descWrapped2, M + P, ry);
+      ry += descH2 + 10;
+
+      // Fix box
+      fCol("#1e1e1e");
+      doc.roundedRect(M + P, ry - 4, TW, fixBoxH, 4, 4, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7); tCol(GREEN);
+      doc.text("RECOMMENDED ACTION", M + P + 8, ry + 8);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); tCol("#cccccc");
+      doc.text(fixWrapped, M + P + 8, ry + 8 + fixLabelH);
+
+      y = recStart + recCardH + GAP;
+    });
+
+    // ═══════════════ FOOTER ═══════════════
+    checkSpace(40);
+    drawGradientBar(M, y, CW, 2);
+    y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); tCol(MUTED);
+    doc.text("Generated by Conversion Intelligence -- avenuez.com", W / 2, y, { align: "center" });
+
+    // Add page numbers to all pages
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      tCol(MUTED);
+      doc.text(`Page ${p}`, W - M, H - 24, { align: "right" });
+    }
+
+    doc.save(`${siteData.companyName.replace(/[^a-zA-Z0-9]/g, "_")}_Conversion_Intelligence_Report.pdf`);
+  };
+
   return (
     <>
       <div style={{background:"#0a0a0a",height:"100vh",color:"#fff",display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -363,7 +810,11 @@ Return ONLY valid JSON:
               </span>
             ))}
             <div style={{width:6,height:6,borderRadius:"50%",background:"#60FF80",marginLeft:4}}/>
-
+            {analysisComplete&&(
+              <button onClick={generatePDF} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#FFFC60,#60FF80,#60FDFF,#39A0FF,#6034FF)",color:"#000",border:"none",borderRadius:99,padding:"5px 14px",fontSize:10,fontWeight:800,cursor:"pointer",letterSpacing:"0.04em",marginLeft:4,flexShrink:0}}>
+                <Download size={11}/> Download PDF
+              </button>
+            )}
           </div>
         </div>
 
@@ -392,6 +843,7 @@ Return ONLY valid JSON:
               {loading?"ANALYZING…":"ANALYZE"}
             </button>
           </div>
+          <p style={{textAlign:"center",fontSize:11,color:"#8A8A8A",padding:"4px 0",margin:0}}>Scan any website. See exactly where your revenue and reputation are at risk.</p>
           {loading&&(
             <div>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
@@ -521,8 +973,8 @@ Return ONLY valid JSON:
                       <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(0,1fr))",gap:10}}>
                         {loading&&!psData
                           ?[1,2,3,4].map(i=><div key={i} className="shimmer" style={{height:60,borderRadius:10}}/>)
-                          :[["LCP",psData?.lcp,"Largest\nContentful\nPaint"],["FCP",psData?.fcp,"First\nContentful\nPaint"],["TBT",psData?.tbt,"Total\nBlocking\nTime"],["CLS",psData?.cls,"Cumulative\nLayout\nShift"]]
-                            .map(([k,v,l])=><VitalCard key={k} label={l.replace(/\\n/g," ")} value={v}/>)
+                          :[["LCP",psData?.lcp,"Largest Contentful Paint"],["FCP",psData?.fcp,"First Contentful Paint"],["TBT",psData?.tbt,"Total Blocking Time"],["CLS",psData?.cls,"Cumulative Layout Shift"]]
+                            .map(([k,v,l])=><VitalCard key={k} label={k} value={v} fullName={l}/>)
                         }
                       </div>
                     </div>
@@ -736,7 +1188,7 @@ Return ONLY valid JSON:
                       <div style={{padding:"12px 14px",display:"flex",alignItems:"flex-start",gap:10}}>
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,flexWrap:"wrap"}}>
-                            <Badge severity={rec.severity}/><CatTag category={rec.category}/>
+                            <Badge severity={rec.severity}/>
                           </div>
                           <div style={{color:"#e0e0e0",fontSize:12,fontWeight:700,lineHeight:1.4}}>{rec.title}</div>
                         </div>
@@ -755,8 +1207,8 @@ Return ONLY valid JSON:
                             </span>
                             {(rec.severity==="critical"||rec.severity==="warning")&&(
                               <a href="https://avenuez.com/contact" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
-                                style={{display:"inline-flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#39A0FF,#6034FF)",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 12px",borderRadius:99,textDecoration:"none",letterSpacing:"0.03em",transition:"opacity 0.2s",cursor:"pointer"}}>
-                                Contact Avenue Z <ExternalLink size={9}/>
+                                style={{display:"inline-flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#39A0FF,#6034FF)",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 12px",borderRadius:99,textDecoration:"none",letterSpacing:"0.03em",transition:"opacity 0.2s",cursor:"pointer",overflow:"visible",whiteSpace:"nowrap",flexShrink:0}}>
+                                <span style={{color:"#fff"}}>{"Contact Avenue Z \u2192"}</span> <ExternalLink size={9} color="#fff"/>
                               </a>
                             )}
                           </div>
