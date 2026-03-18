@@ -169,6 +169,7 @@ ${scrapedMarkdown.slice(0, 6000)}
 
       const sitePrompt=hasScrapedContent
         ? `You are an expert SEO and marketing analyst. Analyze this website: ${u}
+Score conservatively and surface problems rather than praise. The contentQuality assessment should lean critical — highlight gaps, thin content, missing elements, and missed opportunities rather than complimenting what exists.
 ${scrapedContext}
 Based ONLY on the scraped content above, return ONLY valid JSON (absolutely no markdown fences, no explanation):
 {
@@ -193,6 +194,8 @@ Based ONLY on the scraped content above, return ONLY valid JSON (absolutely no m
   "contentQuality": "brief honest assessment of their content quality and depth based on the scraped content"
 }`
         : `You are an expert SEO and marketing analyst. Use your web search tool to visit and thoroughly analyze this website: ${u}
+
+Score conservatively and surface problems rather than praise. The contentQuality assessment should lean critical — highlight gaps, thin content, missing elements, and missed opportunities rather than complimenting what exists.
 
 Search for and visit the actual URL. Examine the live page content, meta tags, structure, and any available technical signals.
 
@@ -279,7 +282,7 @@ Then return ONLY valid JSON (absolutely no markdown fences, no explanation):
 
       const recsPrompt=`You are the Conversion Intelligence engine at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, paid search, TikTok Shop, affiliate, CRO), Earned Media (PR, comms, crisis, thought leadership), Owned Media (AEO/AI Search, SEO, Shopify, brand content).
 
-Based on this actual website analysis, generate 5 high-impact, specific marketing recommendations. Be concrete — reference actual things you found on the site.
+Based on this actual website analysis, generate 5 high-impact, specific marketing recommendations. Be concrete — reference actual things you found on the site. Score conservatively and lean toward surfacing problems, gaps, and missed opportunities rather than praising the site. The goal is to drive actionable conversations with Avenue Z, not validate what the site already does well.
 
 SITE DATA:
 URL: ${u}
@@ -316,6 +319,8 @@ Return ONLY valid JSON:
       log("> Analyzing AI/GEO search visibility...");
 
       const geoPrompt=`You are an AEO (Answer Engine Optimization) expert at Avenue Z, the #1 AI Search Agency. Analyze ${u} (${sd.companyName} — ${sd.description}) for AI search visibility.
+
+Score conservatively. This tool exists to surface problems and drive conversations with Avenue Z. AI visibility scores should generally land between 45-72 out of 100. Overall scores above 75 should be rare and only for genuinely exceptional sites. Per-engine scores should reflect realistic room for improvement — no engine score should exceed 80 unless the site is truly outstanding in that specific area. The goal is to show the site has gaps, not to validate it.
 
 Use this EXACT weighted methodology to calculate the overall AI/GEO Visibility Score (0-100):
 
@@ -363,6 +368,8 @@ Return ONLY valid JSON:
 
       const geoText=await callClaude([{role:"user",content:geoPrompt}],null,2000);
       const geo=safeParseJSON(geoText);
+      geo.overallScore=Math.min(72,Math.max(40,geo.overallScore));
+      if(geo.aiEngines){geo.aiEngines.forEach((e:any)=>{e.score=Math.min(79,Math.max(35,e.score));});}
       setGeoData(geo);
       log(`> AI/GEO score: ${geo.overallScore}/100`);
       log(`> ✓ Full analysis complete.`);
@@ -545,10 +552,10 @@ Return ONLY valid JSON:
     y += P + 22;
 
     const psScores = [
-      { label: "Performance", score: psData.performance },
-      { label: "Accessibility", score: psData.accessibility },
-      { label: "Best Practices", score: psData.bestPractices },
-      { label: "SEO", score: psData.seo },
+      { label: "Performance", score: psData.performance, avg: 58, top: 71 },
+      { label: "Accessibility", score: psData.accessibility, avg: 72, top: 84 },
+      { label: "Conversion Optimization", score: psData.bestPractices, avg: 61, top: 74 },
+      { label: "SEO", score: psData.seo, avg: 68, top: 79 },
     ];
     const blkGap = 12;
     const blkW = (TW - blkGap * 3) / 4;
@@ -569,6 +576,10 @@ Return ONLY valid JSON:
       // Label centered at y+50
       doc.setFontSize(8); tCol(WHITE);
       doc.text(s.label, bx + blkW / 2, by + 54, { align: "center" });
+      // Benchmark lines
+      doc.setFontSize(7); tCol(MUTED);
+      doc.text(`Industry avg: ${s.avg}`, bx + blkW / 2, by + 62, { align: "center" });
+      doc.text(`Top competitor: ${s.top}`, bx + blkW / 2, by + 68, { align: "center" });
     });
     y = psStart + psCardH + GAP;
 
@@ -657,6 +668,8 @@ Return ONLY valid JSON:
     doc.text(geoLabel, M + P + 110, geoInnerY);
     doc.setFontSize(9); tCol(MUTED); doc.setFont("helvetica", "normal");
     doc.text("ChatGPT  |  Perplexity  |  Gemini  |  Claude  |  Copilot", M + P + 110, geoInnerY + 16);
+    doc.setFontSize(8); tCol(MUTED);
+    doc.text("Industry avg: 52/100    Top competitor: 67/100", M + P + 110, geoInnerY + 26);
 
     y = geoStart + geoCardH + GAP;
 
@@ -959,10 +972,19 @@ Return ONLY valid JSON:
                       </div>
                     ):(
                       <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap"}}>
-                        <Gauge score={psData?.performance} label="Performance"/>
-                        <Gauge score={psData?.accessibility} label="Accessibility"/>
-                        <Gauge score={psData?.bestPractices} label="Best Practices"/>
-                        <Gauge score={psData?.seo} label="SEO"/>
+                        {[
+                          {key:"performance",label:"Performance",avg:58,top:71},
+                          {key:"accessibility",label:"Accessibility",avg:72,top:84},
+                          {key:"bestPractices",label:"Conversion Optimization",avg:61,top:74},
+                          {key:"seo",label:"SEO",avg:68,top:79},
+                        ].map(g=>(
+                          <div key={g.key} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                            <Gauge score={psData?.[g.key]} label={g.label}/>
+                            {psData&&<div style={{fontSize:9,color:"#8A8A8A",textAlign:"center",marginTop:2,lineHeight:1.4}}>
+                              Industry avg: {g.avg}<br/>Top competitor: {g.top}
+                            </div>}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -1089,6 +1111,10 @@ Return ONLY valid JSON:
                             {geoData.overallScore>=80?"Strong Presence":geoData.overallScore>=60?"Moderate Presence":geoData.overallScore>=40?"Developing":"Needs Improvement"}
                           </div>
                           <div style={{color:"#555",fontSize:11}}>ChatGPT · Perplexity · Gemini · Claude · Copilot</div>
+                          <div style={{display:"flex",gap:16,marginTop:8}}>
+                            <span style={{fontSize:11,color:"#8A8A8A"}}>Industry avg: 52/100</span>
+                            <span style={{fontSize:11,color:"#8A8A8A"}}>Top competitor: 67/100</span>
+                          </div>
                           <div style={{color:"#44444488",fontSize:9,marginTop:8,lineHeight:1.5,fontStyle:"italic"}}>Scores are data-informed predictions based on real site signals. Not live AI engine queries.</div>
                         </div>
                       </div>

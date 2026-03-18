@@ -4,7 +4,15 @@
       "Bash(npm install:*)",
       "Bash(npx next:*)",
       "Bash(npm run:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3006)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3007)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3008)",
+      "Bash(lsof -iTCP -sTCP:LISTEN -P -n)",
+      "Bash(sort -t: -k2 -n)",
+      "Bash(curl -s -o /tmp/avz_preview.png \"https://api.screenshotone.com/take?url=http://localhost:3007&viewport_width=1440&viewport_height=900&format=png&block_ads=true&delay=2\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
