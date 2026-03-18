@@ -368,8 +368,9 @@ Return ONLY valid JSON:
 
       const geoText=await callClaude([{role:"user",content:geoPrompt}],null,2000);
       const geo=safeParseJSON(geoText);
-      geo.overallScore=Math.min(72,Math.max(40,geo.overallScore));
       if(geo.aiEngines){geo.aiEngines.forEach((e:any)=>{e.score=Math.min(79,Math.max(35,e.score));});}
+      if(geo.aiEngines&&geo.aiEngines.length>0){geo.overallScore=Math.round(geo.aiEngines.reduce((s:number,e:any)=>s+e.score,0)/geo.aiEngines.length);}
+      geo.overallScore=Math.min(72,Math.max(40,geo.overallScore));
       setGeoData(geo);
       log(`> AI/GEO score: ${geo.overallScore}/100`);
       log(`> ✓ Full analysis complete.`);
