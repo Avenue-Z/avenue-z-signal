@@ -67,6 +67,7 @@ function ChkItem({ label, passed, detail }: { label: any; passed: any; detail?: 
       </div>
       <span style={{color:"#ccc",fontSize:12,flex:1}}>{label}</span>
       {detail&&<span style={{color:passed?"#60FF80":"#FF6060",fontSize:11,fontWeight:700}}>{detail}</span>}
+      {!passed&&<a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#FFFC60",fontSize:10,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>Contact Avenue Z</a>}
     </div>
   );
 }
@@ -787,6 +788,13 @@ Return ONLY valid JSON:
       y = recStart + recCardH + GAP;
     });
 
+    // ═══════════════ CONTACT CTA ═══════════════
+    checkSpace(30);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); tCol(YELLOW);
+    doc.text("Ready to fix these issues? Contact Avenue Z at avenuez.com/contact", W / 2, y, { align: "center" });
+    doc.link(W / 2, y, 180, 8, { url: "https://avenuez.com/contact-us/" });
+    y += GAP + 10;
+
     // ═══════════════ FOOTER ═══════════════
     checkSpace(40);
     drawGradientBar(M, y, CW, 2);
@@ -972,7 +980,7 @@ Return ONLY valid JSON:
                         {[1,2,3,4].map(i=><div key={i} className="shimmer" style={{width:90,height:110,borderRadius:12}}/>)}
                       </div>
                     ):(
-                      <div style={{display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap"}}>
+                      <div style={{display:"flex",justifyContent:"space-evenly",flexWrap:"wrap"}}>
                         {[
                           {key:"performance",label:"Performance",avg:58,top:71},
                           {key:"accessibility",label:"Accessibility",avg:72,top:84},
@@ -1233,7 +1241,7 @@ Return ONLY valid JSON:
                               {rec.impact} impact
                             </span>
                             {(rec.severity==="critical"||rec.severity==="warning")&&(
-                              <a href="https://avenuez.com/contact" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
+                              <a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()}
                                 style={{display:"inline-flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#39A0FF,#6034FF)",color:"#fff",fontSize:10,fontWeight:800,padding:"5px 12px",borderRadius:99,textDecoration:"none",letterSpacing:"0.03em",transition:"opacity 0.2s",cursor:"pointer",overflow:"visible",whiteSpace:"nowrap",flexShrink:0}}>
                                 <span style={{color:"#fff"}}>{"Contact Avenue Z \u2192"}</span> <ExternalLink size={9} color="#fff"/>
                               </a>
@@ -1243,6 +1251,12 @@ Return ONLY valid JSON:
                       )}
                     </div>
                   ))}
+                  <div style={{textAlign:"center",marginTop:12}}>
+                    <a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer"
+                      style={{display:"inline-block",background:"#FFFC60",color:"#000000",fontWeight:700,fontSize:13,padding:"12px 24px",borderRadius:6,textDecoration:"none",cursor:"pointer"}}>
+                      Contact Avenue Z to Fix These Issues
+                    </a>
+                  </div>
                 </div>
               ):(
                 <div style={{color:"#2a2a2a",fontSize:12,textAlign:"center",padding:"40px 0",lineHeight:2}}>
