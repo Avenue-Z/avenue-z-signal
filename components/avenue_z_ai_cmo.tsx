@@ -38,11 +38,22 @@ function Gauge({ score, label, size=90 }) {
 }
 
 function VitalCard({ label, value, fullName }: { label: any; value: any; fullName?: string }) {
+  const v=parseFloat(String(value))||0;
+  const gsMap:{[k:string]:{good:number;poor:number;unit:string;gs:string}}={
+    LCP:{good:2.5,poor:4.0,unit:"s",gs:"under 2.5s"},
+    FCP:{good:1.8,poor:3.0,unit:"s",gs:"under 1.8s"},
+    TBT:{good:200,poor:600,unit:"ms",gs:"under 200ms"},
+    CLS:{good:0.1,poor:0.25,unit:"",gs:"under 0.1"},
+  };
+  const gs=gsMap[label as string];
+  const gsColor=gs?(v>=gs.poor?"#FF6060":v>=gs.good?"#FFFC60":"#60FF80"):undefined;
+  const gsText=gs?(v>=gs.poor?`Critical — gold standard: ${gs.gs}`:v>=gs.good?`Below gold standard: ${gs.gs}`:"Meets gold standard ✓"):undefined;
   return (
     <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px 10px",textAlign:"center",border:"1px solid #ffffff08",minWidth:0,overflow:"hidden"}}>
       <div style={{color:"#FFFC60",fontSize:16,fontWeight:800,lineHeight:1,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{value||"—"}</div>
       <div style={{color:"#555",fontSize:11,lineHeight:1.3,fontWeight:700}}>{label}</div>
-      {fullName&&<div style={{color:"#8A8A8A",fontSize:10,lineHeight:1.3,marginTop:2}}>{fullName}</div>}
+      {fullName&&<div style={{color:"#8A8A8A",fontSize:11,lineHeight:1.3,marginTop:2}}>{fullName}</div>}
+      {gsText&&value&&value!=="N/A"&&<div style={{color:gsColor,fontSize:11,fontWeight:600,marginTop:4,textAlign:"center"}}>{gsText}</div>}
     </div>
   );
 }
@@ -59,15 +70,18 @@ function CatTag({ category }) {
   return <span style={{background:`${col}18`,color:col,fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,border:`1px solid ${col}33`,flexShrink:0,display:"inline-block",lineHeight:"normal",whiteSpace:"nowrap"}}>{category||"General"}</span>;
 }
 
-function ChkItem({ label, passed, detail }: { label: any; passed: any; detail?: any }) {
+function ChkItem({ label, passed, detail, impact, timeEst, ctaLabel }: { label: any; passed: any; detail?: any; impact?: string; timeEst?: string; ctaLabel?: string }) {
   return (
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #ffffff07"}}>
-      <div style={{width:20,height:20,borderRadius:"50%",background:passed?"#0f2d18":"#3d1515",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 0",borderBottom:"1px solid #ffffff07"}}>
+      <div style={{width:20,height:20,borderRadius:"50%",background:passed?"#0f2d18":"#3d1515",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
         {passed?<Check size={11} color="#60FF80"/>:<X size={11} color="#FF6060"/>}
       </div>
-      <span style={{color:"#ccc",fontSize:12,flex:1}}>{label}</span>
-      {detail&&<span style={{color:passed?"#60FF80":"#FF6060",fontSize:11,fontWeight:700}}>{detail}</span>}
-      {!passed&&<a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#FFFC60",fontSize:10,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>Contact Avenue Z</a>}
+      <div style={{flex:1,minWidth:0}}>
+        <span style={{color:"#ccc",fontSize:12}}>{label}{!passed&&timeEst&&<span style={{background:"#1a1a1a",borderRadius:99,fontSize:11,color:"#666",padding:"3px 8px",marginLeft:8,display:"inline-block",verticalAlign:"middle"}}>{timeEst}</span>}</span>
+        {!passed&&impact&&<span style={{color:"#666",fontSize:11,lineHeight:1.5,marginTop:3,display:"block"}}>{impact}</span>}
+      </div>
+      {detail&&<span style={{color:passed?"#60FF80":"#FF6060",fontSize:11,fontWeight:700,flexShrink:0}}>{detail}</span>}
+      {!passed&&<a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer" onClick={e=>e.stopPropagation()} style={{color:"#FFFC60",fontSize:11,fontWeight:700,textDecoration:"none",whiteSpace:"nowrap",flexShrink:0}}>{ctaLabel||"Contact Avenue Z"}</a>}
     </div>
   );
 }
@@ -81,6 +95,11 @@ export default function App() {
   const [recs,setRecs]=useState([]);
   const [geoData,setGeoData]=useState(null);
   const [expandedRec,setExpandedRec]=useState(null);
+  const [showPDFGate,setShowPDFGate]=useState(false);
+  const [gateFirstName,setGateFirstName]=useState("");
+  const [gateEmail,setGateEmail]=useState("");
+  const [gateCompany,setGateCompany]=useState("");
+  const [gateError,setGateError]=useState("");
   const [tab,setTab]=useState("health");
   const [chat,setChat]=useState([]);
   const [chatIn,setChatIn]=useState("");
@@ -321,7 +340,7 @@ Return ONLY valid JSON:
 
       const geoPrompt=`You are an AEO (Answer Engine Optimization) expert at Avenue Z, the #1 AI Search Agency. Analyze ${u} (${sd.companyName} — ${sd.description}) for AI search visibility.
 
-Score conservatively. This tool exists to surface problems and drive conversations with Avenue Z. AI visibility scores should generally land between 45-72 out of 100. Overall scores above 75 should be rare and only for genuinely exceptional sites. Per-engine scores should reflect realistic room for improvement — no engine score should exceed 80 unless the site is truly outstanding in that specific area. The goal is to show the site has gaps, not to validate it.
+Score against the gold standard — what a perfectly optimized site would achieve. Most sites naturally fall short of this bar. Surface the gaps clearly and specifically. A site scoring 58 against best-in-class standards is genuinely 58 — this is accurate and defensible. The goal is to reveal real gaps against the highest possible standard so the site owner understands exactly where they need to improve.
 
 Use this EXACT weighted methodology to calculate the overall AI/GEO Visibility Score (0-100):
 
@@ -833,7 +852,7 @@ Return ONLY valid JSON:
             ))}
             <div style={{width:6,height:6,borderRadius:"50%",background:"#60FF80",marginLeft:4}}/>
             {analysisComplete&&(
-              <button onClick={generatePDF} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#FFFC60,#60FF80,#60FDFF,#39A0FF,#6034FF)",color:"#000",border:"none",borderRadius:99,padding:"5px 14px",fontSize:10,fontWeight:800,cursor:"pointer",letterSpacing:"0.04em",marginLeft:4,flexShrink:0}}>
+              <button onClick={()=>setShowPDFGate(true)} style={{display:"flex",alignItems:"center",gap:5,background:"linear-gradient(135deg,#FFFC60,#60FF80,#60FDFF,#39A0FF,#6034FF)",color:"#000",border:"none",borderRadius:99,padding:"5px 14px",fontSize:10,fontWeight:800,cursor:"pointer",letterSpacing:"0.04em",marginLeft:4,flexShrink:0}}>
                 <Download size={11}/> Download PDF
               </button>
             )}
@@ -905,7 +924,7 @@ Return ONLY valid JSON:
                     </div>
                     <div style={{minWidth:0}}>
                       <div style={{color:"#fff",fontWeight:800,fontSize:13,lineHeight:1.2,marginBottom:2}}>{siteData.companyName}</div>
-                      <a href={siteData.url} target="_blank" rel="noreferrer" style={{color:"#444",fontSize:10,display:"flex",alignItems:"center",gap:3,textDecoration:"none"}}>
+                      <a href={siteData.url} target="_blank" rel="noreferrer" style={{color:"#444",fontSize:11,display:"flex",alignItems:"center",gap:3,textDecoration:"none"}}>
                         {new URL(siteData.url).hostname}<ExternalLink size={8}/>
                       </a>
                     </div>
@@ -950,7 +969,7 @@ Return ONLY valid JSON:
               {AVENUE_Z.caseStudies.slice(0,5).map((cs,i)=>(
                 <div key={i} style={{padding:"6px 0",borderBottom:i<4?"1px solid #ffffff07":"none"}}>
                   <div style={{color:"#ccc",fontSize:11,fontWeight:700}}>{cs.client}</div>
-                  <div style={{color:"#60FF80",fontSize:10,marginTop:1}}>{cs.result}</div>
+                  <div style={{color:"#60FF80",fontSize:11,marginTop:1}}>{cs.result}</div>
                 </div>
               ))}
             </div>
@@ -962,7 +981,7 @@ Return ONLY valid JSON:
               {["health","links","ai-geo","passed"].map(t=>(
                 <button key={t} onClick={()=>setTab(t)}
                   style={{padding:"12px 16px",background:"none",border:"none",borderBottom:tab===t?"2px solid #FFFC60":"2px solid transparent",color:tab===t?"#FFFC60":"#444",fontWeight:700,fontSize:11,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",transition:"color 0.2s"}}>
-                  {t==="ai-geo"?"AI/GEO":t==="passed"?"Passed ✓":t.charAt(0).toUpperCase()+t.slice(1)}
+                  {t==="health"?"Site Audit":t==="ai-geo"?"AI/GEO":t==="passed"?"What's Working ✓":t.charAt(0).toUpperCase()+t.slice(1)}
                 </button>
               ))}
             </div>
@@ -970,6 +989,53 @@ Return ONLY valid JSON:
             <div style={{flex:1,overflowY:"auto",padding:16}}>
               {tab==="health"&&(
                 <div className="fi">
+                  {siteData&&psData&&(()=>{
+                    const cc=[psData.performance<90,psData.accessibility<90,!siteData.hasSchema,siteData.missingAlt>0,!siteData.https,!siteData.mobileResponsive,psData.seo<90,siteData.h1Tags===0,siteData.descriptionLength===0].filter(Boolean).length;
+                    const perf=psData.performance;const a11y=psData.accessibility;const seo=psData.seo;const bp=psData.bestPractices;
+                    const headline=perf<50&&!siteData.hasSchema
+                      ?"This site is critically slow and invisible to AI search engines — your revenue and reputation are actively at risk."
+                      :perf<50&&siteData.hasSchema
+                      ?"This site loads critically slow — every second of delay is costing you conversions and revenue."
+                      :perf>=50&&!siteData.hasSchema
+                      ?"This site is invisible to ChatGPT, Perplexity, and Google AI — competitors with schema are getting citations you're missing."
+                      :perf>=50&&a11y<90
+                      ?"This site fails WCAG AAA accessibility standards — excluding users with disabilities and falling short of the gold standard."
+                      :perf>=70&&a11y>=70&&seo>=70&&cc>0
+                      ?`This site has ${cc} gaps against the gold standard — here's exactly what's at risk.`
+                      :`This site is performing well against gold standard benchmarks — ${cc} opportunities identified.`;
+                    const subline=!siteData.hasSchema&&perf<90
+                      ?`ChatGPT, Perplexity, and Google AI cannot cite this site — and it loads ${perf}/100 against a gold standard of 90.`
+                      :!siteData.hasSchema&&perf>=90
+                      ?"ChatGPT, Perplexity, and Google AI cannot cite this site due to missing schema markup."
+                      :siteData.hasSchema&&perf<50
+                      ?"Site performance is critically below gold standard — every second of delay costs conversions."
+                      :`This site has ${cc} gaps against the gold standard. See exactly what's at risk below.`;
+                    const pills:{text:string;color:string}[]=[];
+                    if(perf<90)pills.push({text:`Performance: ${perf}/100 — ${90-perf} pts below gold standard`,color:"#FF6060"});
+                    if(a11y<90)pills.push({text:`Accessibility: ${a11y}/100 — ${90-a11y} pts below gold standard`,color:"#FF6060"});
+                    if(!siteData.hasSchema)pills.push({text:"No Schema Markup — invisible to AI engines",color:"#FF6060"});
+                    if(siteData.missingAlt>0)pills.push({text:`${siteData.missingAlt} Images Missing Alt Text`,color:"#FF6060"});
+                    if(seo<90)pills.push({text:`SEO: ${seo}/100 — ${90-seo} pts below gold standard`,color:"#FF6060"});
+                    if(bp<90)pills.push({text:`Conversion Optimization: ${bp}/100 — ${90-bp} pts below gold standard`,color:"#FFFC60"});
+                    if(!siteData.mobileResponsive)pills.push({text:"Not Mobile Optimized",color:"#FF6060"});
+                    if(!siteData.https)pills.push({text:"No HTTPS — Security Risk",color:"#FF6060"});
+                    if(siteData.h1Tags===0)pills.push({text:"Missing H1 Tag",color:"#FFFC60"});
+                    if(siteData.descriptionLength===0)pills.push({text:"Missing Meta Description",color:"#FFFC60"});
+                    const showPills=pills.slice(0,6);
+                    const isGood=cc===0;
+                    return (
+                      <div style={{background:isGood?"rgba(96,255,128,0.03)":"linear-gradient(135deg,rgba(255,96,96,0.08),rgba(255,96,96,0.03))",border:`1px solid ${isGood?"rgba(96,255,128,0.15)":"rgba(255,96,96,0.15)"}`,borderRadius:14,padding:"20px 24px",marginBottom:16}}>
+                        <div style={{color:isGood?"#60FF80":"#FF6060",fontSize:9,fontWeight:800,letterSpacing:"0.12em",marginBottom:10}}>REVENUE & REPUTATION RISK ASSESSMENT</div>
+                        <div style={{color:"#fff",fontSize:15,fontWeight:700,lineHeight:1.5,marginBottom:14}}>{headline}</div>
+                        <div style={{color:"#aaa",fontSize:13,fontWeight:400,lineHeight:1.6,marginBottom:14,marginTop:-8}}>{subline}</div>
+                        {showPills.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>{showPills.map((p,i)=><span key={i} style={{background:"#1a1a1a",borderRadius:99,padding:"5px 12px",fontSize:11,fontWeight:600,color:p.color,display:"inline-block"}}><span style={{width:6,height:6,borderRadius:"50%",background:p.color,display:"inline-block",marginRight:6,verticalAlign:"middle"}}/>{p.text}</span>)}</div>}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{color:"#666",fontSize:11}}>{cc} issues found against gold standard benchmarks</span>
+                          <a href="https://avenuez.com/contact-us/" target="_blank" rel="noopener noreferrer" style={{background:"#FF6060",color:"#000",fontWeight:800,fontSize:11,borderRadius:99,padding:"7px 16px",border:"none",cursor:"pointer",textDecoration:"none"}}>Get a Free Strategy Session →</a>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20,marginBottom:14}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
                       <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>PAGESPEED SCORES</div>
@@ -982,16 +1048,14 @@ Return ONLY valid JSON:
                     ):(
                       <div style={{display:"flex",justifyContent:"space-evenly",flexWrap:"wrap"}}>
                         {[
-                          {key:"performance",label:"Performance",avg:58,top:71},
-                          {key:"accessibility",label:"Accessibility",avg:72,top:84},
-                          {key:"bestPractices",label:"Conversion Optimization",avg:73,top:87},
-                          {key:"seo",label:"SEO",avg:68,top:79},
+                          {key:"performance",label:"Performance"},
+                          {key:"accessibility",label:"Accessibility"},
+                          {key:"bestPractices",label:"Conversion Optimization"},
+                          {key:"seo",label:"SEO"},
                         ].map(g=>(
                           <div key={g.key} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
                             <Gauge score={psData?.[g.key]} label={g.label}/>
-                            {psData&&<div style={{fontSize:9,color:"#8A8A8A",textAlign:"center",marginTop:2,lineHeight:1.4}}>
-                              Industry avg: {g.avg}<br/>Top competitor: {g.top}
-                            </div>}
+                            {psData&&<div style={{color:"#444",fontSize:11,textAlign:"center",marginTop:4}}>Gold standard: 90+</div>}
                           </div>
                         ))}
                       </div>
@@ -1012,18 +1076,18 @@ Return ONLY valid JSON:
                   )}
 
                   <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20}}>
-                    <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:14}}>SEO HEALTH CHECKLIST</div>
+                    <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:14}}>GOLD STANDARD CHECKLIST</div>
                     {loading&&!siteData
                       ?[1,2,3,4,5,6,7].map(i=><div key={i} className="shimmer" style={{height:30,borderRadius:8,marginBottom:6}}/>)
                       :siteData?(
                         <>
-                          <ChkItem label="Meta Title" passed={siteData.titleLength>0} detail={siteData.titleLength>0?`${siteData.titleLength} chars`:"Missing"}/>
-                          <ChkItem label="Meta Description" passed={siteData.descriptionLength>0} detail={siteData.descriptionLength>0?`${siteData.descriptionLength} chars`:"Missing"}/>
-                          <ChkItem label="HTTPS Secure" passed={siteData.https}/>
-                          <ChkItem label="Mobile Responsive" passed={siteData.mobileResponsive}/>
-                          <ChkItem label="Structured Data (Schema)" passed={siteData.hasSchema}/>
-                          <ChkItem label="H1 Tag Present" passed={siteData.h1Tags>0} detail={siteData.h1Tags>0?`${siteData.h1Tags} found`:"None"}/>
-                          <ChkItem label="Image Alt Text" passed={siteData.missingAlt===0} detail={siteData.missingAlt>0?`${siteData.missingAlt} missing`:"All tagged"}/>
+                          <ChkItem label="Meta Title" passed={siteData.titleLength>0} detail={siteData.titleLength>0?`${siteData.titleLength} chars`:"Missing"} impact="Poor title tags directly limit search rankings and click-through rates" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
+                          <ChkItem label="Meta Description" passed={siteData.descriptionLength>0} detail={siteData.descriptionLength>0?`${siteData.descriptionLength} chars`:"Missing"} impact="Missing meta description reduces clicks from search results" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
+                          <ChkItem label="HTTPS Secure" passed={siteData.https} impact="Unsecured sites are penalized by Google and flagged unsafe by browsers" timeEst="est. 1 hr" ctaLabel="Talk to Avenue Z about Web Design →"/>
+                          <ChkItem label="Mobile Responsive" passed={siteData.mobileResponsive} impact="Over 60% of web traffic is mobile — non-responsive sites lose this audience" timeEst="est. 2-4 wks" ctaLabel="Talk to Avenue Z about Web Design →"/>
+                          <ChkItem label="Structured Data (Schema)" passed={siteData.hasSchema} impact="No schema means ChatGPT, Perplexity, and Google AI cannot cite this site" timeEst="est. 4-6 hrs" ctaLabel="Talk to Avenue Z about AEO →"/>
+                          <ChkItem label="H1 Tag Present" passed={siteData.h1Tags>0} detail={siteData.h1Tags>0?`${siteData.h1Tags} found`:"None"} impact="Missing H1 tag confuses search engines about this page topic" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
+                          <ChkItem label="Image Alt Text" passed={siteData.missingAlt===0} detail={siteData.missingAlt>0?`${siteData.missingAlt} missing`:"All tagged"} impact="Images without alt text are invisible to search engines and screen readers" timeEst="est. 30 min" ctaLabel="Talk to Avenue Z about Content →"/>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:14}}>
                             <div style={{background:"#1e1e1e",borderRadius:10,padding:14,border:"1px solid #ffffff08"}}>
                               <div style={{color:"#39A0FF",fontSize:22,fontWeight:900}}>{siteData.internalLinks}</div>
@@ -1120,11 +1184,8 @@ Return ONLY valid JSON:
                             {geoData.overallScore>=80?"Strong Presence":geoData.overallScore>=60?"Moderate Presence":geoData.overallScore>=40?"Developing":"Needs Improvement"}
                           </div>
                           <div style={{color:"#555",fontSize:11}}>ChatGPT · Perplexity · Gemini · Claude · Copilot</div>
-                          <div style={{display:"flex",gap:16,marginTop:8}}>
-                            <span style={{fontSize:11,color:"#8A8A8A"}}>Industry avg: 52/100</span>
-                            <span style={{fontSize:11,color:"#8A8A8A"}}>Top competitor: 67/100</span>
-                          </div>
-                          <div style={{color:"#44444488",fontSize:9,marginTop:8,lineHeight:1.5,fontStyle:"italic"}}>Scores are data-informed predictions based on real site signals. Not live AI engine queries.</div>
+                          <div style={{color:"#666",fontSize:12,fontStyle:"italic",marginTop:4}}>Scored against gold standard AI optimization benchmarks</div>
+                          <div style={{color:"#555",fontSize:11,marginTop:8,lineHeight:1.5,fontStyle:"italic"}}>Scores are data-informed predictions based on real site signals. Not live AI engine queries.</div>
                         </div>
                       </div>
 
@@ -1145,7 +1206,7 @@ Return ONLY valid JSON:
                                   <div style={{height:4,background:"#1e1e1e",borderRadius:99,overflow:"hidden",marginBottom:4}}>
                                     <div style={{height:"100%",width:`${e.score}%`,background:col,borderRadius:99,transition:"width 1.2s ease"}}/>
                                   </div>
-                                  <div style={{color:"#555",fontSize:10,lineHeight:1.4}}>{e.note}</div>
+                                  <div style={{color:"#555",fontSize:11,lineHeight:1.4}}>{e.note}</div>
                                 </div>
                                 <span style={{background:`${col}18`,color:col,fontSize:9,fontWeight:800,padding:"3px 8px",borderRadius:99,flexShrink:0,textTransform:"uppercase",border:`1px solid ${col}28`}}>{e.status}</span>
                               </div>
@@ -1188,6 +1249,7 @@ Return ONLY valid JSON:
                 <div className="fi">
                   <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20}}>
                     <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:14}}>PASSING CHECKS ({passed.length})</div>
+                    {passed.length>0&&<div style={{color:"#888",fontSize:12,marginBottom:16,lineHeight:1.6}}>These areas are performing well — keep them maintained to protect your rankings and visibility.</div>}
                     {passed.length>0?passed.map((c,i)=>(
                       <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:i<passed.length-1?"1px solid #ffffff07":"none"}}>
                         <div style={{width:20,height:20,borderRadius:"50%",background:"#0f2d18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
@@ -1226,6 +1288,7 @@ Return ONLY valid JSON:
                             <Badge severity={rec.severity}/>
                           </div>
                           <div style={{color:"#e0e0e0",fontSize:12,fontWeight:700,lineHeight:1.4}}>{rec.title}</div>
+                          {expandedRec!==i&&<div style={{color:"#888",fontSize:11,lineHeight:1.5,marginTop:4}}>{rec.severity==="critical"?"This is actively costing you traffic and revenue right now.":rec.severity==="warning"?"Competitors without this issue have a measurable advantage over you.":"Fixing this would directly improve your search and AI visibility."}</div>}
                         </div>
                         {expandedRec===i?<ChevronDown size={14} color="#444" style={{flexShrink:0,marginTop:2}}/>:<ChevronRight size={14} color="#444" style={{flexShrink:0,marginTop:2}}/>}
                       </div>
@@ -1313,6 +1376,23 @@ Return ONLY valid JSON:
         </div>
 
       </div>
+      {showPDFGate&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#111111",border:"1px solid rgba(255,255,255,0.08)",borderRadius:16,padding:32,width:"100%",maxWidth:420,position:"relative"}}>
+            <button onClick={()=>{setShowPDFGate(false);setGateError("");}} style={{position:"absolute",top:16,right:16,background:"none",border:"none",color:"#666",fontSize:22,cursor:"pointer",lineHeight:1}}>&times;</button>
+            <span style={{color:"#fff",fontSize:20,fontWeight:800,marginBottom:8,display:"block"}}>Get Your Full Report</span>
+            <span style={{color:"#666",fontSize:13,marginBottom:24,lineHeight:1.5,display:"block"}}>Enter your details to download your free website audit.</span>
+            <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>FIRST NAME</div>
+            <input value={gateFirstName} onChange={e=>setGateFirstName(e.target.value)} placeholder="Your first name" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
+            <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>WORK EMAIL</div>
+            <input value={gateEmail} onChange={e=>setGateEmail(e.target.value)} placeholder="your@company.com" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
+            <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>COMPANY NAME</div>
+            <input value={gateCompany} onChange={e=>setGateCompany(e.target.value)} placeholder="Your company" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
+            <div style={{color:"#FF6060",fontSize:11,marginBottom:8,minHeight:16}}>{gateError}</div>
+            <button onClick={()=>{if(!gateFirstName.trim()||!gateEmail.trim()||!gateEmail.includes("@")){setGateError("Please enter your name and a valid email to continue.");return;}generatePDF();setShowPDFGate(false);setGateError("");setGateFirstName("");setGateEmail("");setGateCompany("");}} style={{background:"linear-gradient(135deg,#FFFC60,#60FF80)",color:"#000000",fontWeight:800,fontSize:14,borderRadius:99,padding:"14px 24px",width:"100%",border:"none",cursor:"pointer",marginTop:4,letterSpacing:"0.02em"}}>Download My Report</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
