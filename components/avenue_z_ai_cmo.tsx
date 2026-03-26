@@ -401,14 +401,16 @@ Return ONLY valid JSON:
     setLoading(false);
   };
 
-  const sendChat=async()=>{
-    if(!chatIn.trim()||chatLoading)return;
-    const msg=chatIn.trim();setChatIn("");
+  const sendChat=async(directMsg?:string)=>{
+    const msg=(directMsg||chatIn).trim();
+    if(!msg||chatLoading)return;
+    setChatIn("");
     setChat(p=>[...p,{role:"user",content:msg}]);
     setChatLoading(true);
     try{
-      const ctx=siteData?`Analyzed site: ${siteData.url} | Company: ${siteData.companyName} | ${siteData.description} | PageSpeed: Perf ${psData?.performance??'N/A'}, SEO ${psData?.seo??'N/A'} | HTTPS: ${siteData.https}, Mobile: ${siteData.mobileResponsive}, Schema: ${siteData.hasSchema} | H1s: ${siteData.h1Tags}, Images: ${siteData.totalImages} (${siteData.missingAlt} missing alt) | Links: ${siteData.internalLinks} int, ${siteData.externalLinks} ext | AI/GEO Score: ${geoData?.overallScore??'N/A'}/100`:"No site analyzed yet.";
-      const sys=`You are the Conversion Intelligence engine at Avenue Z, the #1 AI Search Agency ($1B+ commerce driven). Services: Performance Media (paid social, TikTok Shop, paid search, CRO, affiliate), Earned Media (PR, crisis comms, thought leadership), Owned Media (AEO, SEO, Shopify dev, content). Be concise, strategic, specific. Always connect advice to Avenue Z capabilities.\n\nCurrent analysis context: ${ctx}`;
+      const engines=geoData?.aiEngines||[];
+      const eng=(name:string)=>engines.find((e:any)=>e.name===name)?.score??'N/A';
+      const sys=`You are a senior strategist at Avenue Z, the #1 AI Search Agency. A prospect has just received their website audit. Your job is to give them sharp, specific strategic advice that goes beyond what the audit already shows on screen. Do not repeat or summarize findings they can already see. Instead: prioritize what to fix first and why, explain the business and revenue impact of each gap, tell them specifically what Avenue Z would do and in what order, and make them feel the urgency of acting now. Be direct, confident, and specific. Reference their actual scores and findings. Never give generic advice. Always connect recommendations to Avenue Z services: AEO for AI visibility, CRO for performance, SEO for search signals, Web Design for accessibility and mobile, Content for alt text and copy gaps. Current audit data: Site URL: ${siteData?.url??'N/A'}. Performance: ${psData?.performance??'N/A'}/100. Accessibility: ${psData?.accessibility??'N/A'}/100. SEO: ${psData?.seo??'N/A'}/100. Conversion Optimization: ${psData?.bestPractices??'N/A'}/100. LCP: ${psData?.lcp??'N/A'}. Schema markup: ${siteData?.hasSchema?'yes':'no'}. Missing alt text: ${siteData?.missingAlt??0} images. AI/GEO visibility score: ${geoData?.overallScore??'N/A'}/100. Top engines: ChatGPT ${eng('ChatGPT')}, Perplexity ${eng('Perplexity')}, Gemini ${eng('Google Gemini')}.`;
       const history=chat.map(m=>({role:m.role,content:m.content}));
       const text=await callClaude([...history,{role:"user",content:msg}],sys,800);
       setChat(p=>[...p,{role:"assistant",content:text}]);
@@ -1361,11 +1363,22 @@ Return ONLY valid JSON:
                 )}
               </div>
               <div style={{padding:"10px 14px 14px",flexShrink:0}}>
+                {analysisComplete&&chat.length===0&&(
+                  <div style={{marginBottom:8}}>
+                    {["Which issue is costing me the most?","What would Avenue Z fix first?","How does my AI score affect leads?"].map((q,i)=>(
+                      <span key={i} onClick={()=>sendChat(q)}
+                        style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.08)",borderRadius:99,padding:"6px 14px",fontSize:11,color:"#888",cursor:"pointer",display:"inline-block",marginRight:6,marginBottom:8,transition:"all 0.2s"}}
+                        onMouseEnter={e=>{(e.target as HTMLElement).style.borderColor="rgba(255,252,96,0.3)";(e.target as HTMLElement).style.color="#FFFC60";}}
+                        onMouseLeave={e=>{(e.target as HTMLElement).style.borderColor="rgba(255,255,255,0.08)";(e.target as HTMLElement).style.color="#888";}}
+                      >{q}</span>
+                    ))}
+                  </div>
+                )}
                 <div style={{display:"flex",gap:8,background:"#111",border:"1px solid #ffffff12",borderRadius:12,padding:"8px 8px 8px 14px",alignItems:"flex-end"}}>
                   <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendChat()}
                     placeholder="Ask Conversion Intelligence anything…"
                     style={{flex:1,background:"none",border:"none",color:"#ddd",fontSize:12,outline:"none",resize:"none",lineHeight:1.5}}/>
-                  <button onClick={sendChat} disabled={chatLoading||!chatIn.trim()}
+                  <button onClick={()=>sendChat()} disabled={chatLoading||!chatIn.trim()}
                     style={{width:32,height:32,borderRadius:8,border:"none",cursor:chatLoading||!chatIn.trim()?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",background:chatLoading||!chatIn.trim()?"#1e1e1e":"linear-gradient(135deg,#FFFC60,#60FF80)",flexShrink:0}}>
                     <Send size={13} color={chatLoading||!chatIn.trim()?"#333":"#000"}/>
                   </button>
