@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, ChevronDown, ChevronRight, ExternalLink, Check, X, Loader2, Terminal, MessageSquare, Globe, Search, Zap, TrendingUp, Download } from "lucide-react";
+import { Send, ChevronDown, ChevronRight, ExternalLink, Check, X, Loader2, Terminal, MessageSquare, Globe, Search, Zap, TrendingUp, Download, Info } from "lucide-react";
 import jsPDF from "jspdf";
 
 const AVENUE_Z = {
@@ -53,7 +53,7 @@ function VitalCard({ label, value, fullName }: { label: any; value: any; fullNam
       <div style={{color:"#FFFC60",fontSize:16,fontWeight:800,lineHeight:1,marginBottom:6,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{value||"—"}</div>
       <div style={{color:"#555",fontSize:11,lineHeight:1.3,fontWeight:700}}>{label}</div>
       {fullName&&<div style={{color:"#8A8A8A",fontSize:11,lineHeight:1.3,marginTop:2}}>{fullName}</div>}
-      {gsText&&value&&value!=="N/A"&&<div style={{color:gsColor,fontSize:11,fontWeight:600,marginTop:4,textAlign:"center"}}>{gsText}</div>}
+      {gsText&&value&&value!=="N/A"&&<div style={{color:gsColor,fontSize:11,fontWeight:600,marginTop:4,textAlign:"center"}}>{gsText}<RefIcon tooltip="Core Web Vitals thresholds" href="https://web.dev/articles/vitals"/></div>}
     </div>
   );
 }
@@ -68,6 +68,31 @@ function CatTag({ category }) {
   const c={SEO:"#39A0FF",AEO:"#6034FF",Content:"#60FDFF",Technical:"#FFFC60","Performance Media":"#60FF80",PR:"#FF6060"};
   const col=c[category]||"#8A8A8A";
   return <span style={{background:`${col}18`,color:col,fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,border:`1px solid ${col}33`,flexShrink:0,display:"inline-block",lineHeight:"normal",whiteSpace:"nowrap"}}>{category||"General"}</span>;
+}
+
+function RefIcon({ tooltip, href }: { tooltip: string; href: string }) {
+  const [show,setShow]=useState(false);
+  return (
+    <span style={{position:"relative",display:"inline-flex",alignItems:"center",marginLeft:5,verticalAlign:"middle",cursor:"pointer"}}
+      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}
+      onClick={()=>window.open(href,"_blank","noopener,noreferrer")}>
+      <Info size={14} color="#aaa" style={{transition:"color 0.2s"}} onMouseEnter={e=>(e.currentTarget.style.color="#fff")} onMouseLeave={e=>(e.currentTarget.style.color="#aaa")}/>
+      {show&&<span style={{position:"absolute",bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#1e1e1e",border:"1px solid #333",borderRadius:8,padding:"6px 10px",fontSize:10,color:"#aaa",whiteSpace:"nowrap",zIndex:100,pointerEvents:"none",boxShadow:"0 4px 12px rgba(0,0,0,0.5)"}}>{tooltip}</span>}
+    </span>
+  );
+}
+
+function ScoringModal({ open, onClose, title, children }: { open: boolean; onClose: ()=>void; title: string; children: any }) {
+  if(!open) return null;
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.7)",backdropFilter:"blur(4px)"}} onClick={onClose}>
+      <div style={{background:"#141414",border:"1px solid #ffffff15",borderRadius:16,padding:"28px 32px",maxWidth:480,width:"90%",position:"relative",boxShadow:"0 20px 60px rgba(0,0,0,0.6)"}} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} style={{position:"absolute",top:12,right:14,background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:18,lineHeight:1}}>✕</button>
+        <div style={{fontSize:10,color:"#FFFC60",fontWeight:800,letterSpacing:"0.12em",marginBottom:12}}>{title}</div>
+        <div style={{color:"#bbb",fontSize:13,lineHeight:1.7}}>{children}</div>
+      </div>
+    </div>
+  );
 }
 
 function ChkItem({ label, passed, detail, impact, timeEst, ctaLabel }: { label: any; passed: any; detail?: any; impact?: string; timeEst?: string; ctaLabel?: string }) {
@@ -95,8 +120,11 @@ export default function App() {
   const [recs,setRecs]=useState([]);
   const [geoData,setGeoData]=useState(null);
   const [expandedRec,setExpandedRec]=useState(null);
+  const [showGoldModal,setShowGoldModal]=useState(false);
+  const [showGeoModal,setShowGeoModal]=useState(false);
   const [showPDFGate,setShowPDFGate]=useState(false);
   const [gateFirstName,setGateFirstName]=useState("");
+  const [gateLastName,setGateLastName]=useState("");
   const [gateEmail,setGateEmail]=useState("");
   const [gateCompany,setGateCompany]=useState("");
   const [gateError,setGateError]=useState("");
@@ -410,7 +438,7 @@ Return ONLY valid JSON:
     try{
       const engines=geoData?.aiEngines||[];
       const eng=(name:string)=>engines.find((e:any)=>e.name===name)?.score??'N/A';
-      const sys=`You are a senior strategist at Avenue Z, the #1 AI Search Agency. A prospect has just received their website audit. You are speaking directly TO the website owner about THEIR site as an Avenue Z strategist already engaged with them. Use a consultative we/your voice — say 'your site', 'your performance score', 'we would fix this first', 'we'd start with', 'our recommendation is', 'here's what we'd do'. Speak as if Avenue Z is already their agency and you are advising them on what to do next. Never say 'Avenue Z should' as a third party — say 'we would' or 'our team would'. The website owner is the prospect, Avenue Z is the expert advisor speaking directly to them. Your job is to give them sharp, specific strategic advice that goes beyond what the audit already shows on screen. Do not repeat or summarize findings they can already see. Instead: prioritize what to fix first and why, explain the business and revenue impact of each gap, tell them specifically what Avenue Z would do and in what order, and make them feel the urgency of acting now. Be direct, confident, and specific. Reference their actual scores and findings. Never give generic advice. Always connect recommendations to Avenue Z services: AEO for AI visibility, CRO for performance, SEO for search signals, Web Design for accessibility and mobile, Content for alt text and copy gaps. Current audit data: Site URL: ${siteData?.url??'N/A'}. Performance: ${psData?.performance??'N/A'}/100. Accessibility: ${psData?.accessibility??'N/A'}/100. SEO: ${psData?.seo??'N/A'}/100. Conversion Optimization: ${psData?.bestPractices??'N/A'}/100. LCP: ${psData?.lcp??'N/A'}. Schema markup: ${siteData?.hasSchema?'yes':'no'}. Missing alt text: ${siteData?.missingAlt??0} images. AI/GEO visibility score: ${geoData?.overallScore??'N/A'}/100. Top engines: ChatGPT ${eng('ChatGPT')}, Perplexity ${eng('Perplexity')}, Gemini ${eng('Google Gemini')}.`;
+      const sys=`You are a senior SEO strategist at Avenue Z, the #1 AI Search Agency. A prospect has just received their SEO audit. You are speaking directly TO the website owner about THEIR site as an Avenue Z strategist already engaged with them. Use a consultative we/your voice — say 'your site', 'your SEO score', 'we would fix this first', 'we'd start with', 'our recommendation is', 'here's what we'd do'. Speak as if Avenue Z is already their SEO agency and you are advising them on what to do next. Never say 'Avenue Z should' as a third party — say 'we would' or 'our team would'. The website owner is the prospect, Avenue Z is the expert SEO advisor speaking directly to them. Your job is to give them sharp, specific SEO strategy advice that goes beyond what the audit already shows on screen. Do not repeat or summarize findings they can already see. Instead: prioritize what to fix first for maximum impact and why, explain how each gap affects Google rankings and organic traffic, tell them specifically what Avenue Z's SEO team would do and in what order, and make them feel the urgency of acting now to protect their search visibility. Be direct, confident, and specific. Reference their actual scores and findings. Never give generic advice. Always frame recommendations through SEO lens — how Performance affects search rankings, how Accessibility improves user signals, how Schema helps Google understand content, how mobile-responsiveness impacts mobile-first indexing. Connect to Avenue Z's SEO services. Current audit data: Site URL: ${siteData?.url??'N/A'}. Performance: ${psData?.performance??'N/A'}/100 (affects SEO rankings). Accessibility: ${psData?.accessibility??'N/A'}/100 (user experience signal). SEO: ${psData?.seo??'N/A'}/100. Conversion Optimization: ${psData?.bestPractices??'N/A'}/100 (bounce rate affects SEO). LCP: ${psData?.lcp??'N/A'} (Core Web Vital, Google ranking factor). Schema markup: ${siteData?.hasSchema?'yes':'no'} (helps Google understand content). Missing alt text: ${siteData?.missingAlt??0} images (affects image search SEO). AI/GEO visibility score: ${geoData?.overallScore??'N/A'}/100 (modern SEO includes AI engine visibility). Top engines: ChatGPT ${eng('ChatGPT')}, Perplexity ${eng('Perplexity')}, Gemini ${eng('Google Gemini')}.`;
       const history=chat.map(m=>({role:m.role,content:m.content}));
       const text=await callClaude([...history,{role:"user",content:msg}],sys,800);
       setChat(p=>[...p,{role:"assistant",content:text}]);
@@ -508,7 +536,7 @@ Return ONLY valid JSON:
     tCol(MUTED); doc.text("  |  ", M + lw, y);
     const sw = doc.getTextWidth("  |  ");
     doc.setFontSize(10); tCol(MUTED);
-    doc.text("CONVERSION INTELLIGENCE", M + lw + sw, y);
+    doc.text("SEO AUDIT REPORT", M + lw + sw, y);
     y += 10;
 
     // Gradient bar
@@ -519,8 +547,9 @@ Return ONLY valid JSON:
     doc.setFont("helvetica", "normal"); doc.setFontSize(10); tCol(MUTED);
     doc.text(`Report Date: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, M, y);
     y += 16;
+    const cleanDomain = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].split('?')[0];
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); tCol(WHITE);
-    doc.text(`URL Analyzed: ${siteData.url}`, M, y);
+    doc.text(`Company Website: ${cleanDomain(siteData.url)}`, M, y);
     y += GAP + 10;
 
     // ═══════════════ COMPANY PROFILE ═══════════════
@@ -561,7 +590,7 @@ Return ONLY valid JSON:
     y = cpStart + cpH + GAP;
 
     // ═══════════════ PAGESPEED SCORES ═══════════════
-    const psCardH = P + 22 + 70 + 16 + P;
+    const psCardH = P + 22 + 92 + 16 + P;
     checkSpace(psCardH);
     const psStart = y;
     card(M, y, CW, psCardH);
@@ -575,34 +604,43 @@ Return ONLY valid JSON:
     y += P + 22;
 
     const psScores = [
-      { label: "Performance", score: psData.performance, avg: 58, top: 71 },
-      { label: "Accessibility", score: psData.accessibility, avg: 72, top: 84 },
-      { label: "Conversion Optimization", score: psData.bestPractices, avg: 73, top: 87 },
-      { label: "SEO", score: psData.seo, avg: 68, top: 79 },
+      { label: "Performance", score: psData.performance, seoTip: "Fast sites rank higher in Google search results" },
+      { label: "Accessibility", score: psData.accessibility, seoTip: "Better accessibility improves user experience signals for SEO" },
+      { label: "Conv. Optimization", score: psData.bestPractices, seoTip: "Site usability affects bounce rate — a key SEO ranking factor" },
+      { label: "SEO", score: psData.seo, seoTip: "" },
     ];
     const blkGap = 12;
     const blkW = (TW - blkGap * 3) / 4;
-    const blkH = 70;
+    const blkH = 92;
     psScores.forEach((s, i) => {
       const bx = M + P + i * (blkW + blkGap);
       const by = y;
-      // Colored block background
+      // Fixed-height block background
       fCol(scoreCol(s.score));
       doc.roundedRect(bx, by, blkW, blkH, 6, 6, "F");
       // Dark overlay for readability
       fCol("#00000088");
       doc.roundedRect(bx, by, blkW, blkH, 6, 6, "F");
-      // Score number centered at y+30
+      // Score number — fixed at by+26
       doc.setFont("helvetica", "bold"); doc.setFontSize(26);
       tCol(scoreCol(s.score));
-      doc.text(String(s.score), bx + blkW / 2, by + 34, { align: "center" });
-      // Label centered at y+50
+      doc.text(String(s.score), bx + blkW / 2, by + 26, { align: "center" });
+      // Label — fixed at by+42
       doc.setFontSize(8); tCol(WHITE);
-      doc.text(s.label, bx + blkW / 2, by + 54, { align: "center" });
-      // Benchmark lines
+      doc.text(s.label, bx + blkW / 2, by + 42, { align: "center" });
+      // Gold standard — fixed at by+55
       doc.setFontSize(7); tCol(MUTED);
-      doc.text(`Industry avg: ${s.avg}`, bx + blkW / 2, by + 62, { align: "center" });
-      doc.text(`Top competitor: ${s.top}`, bx + blkW / 2, by + 68, { align: "center" });
+      doc.text("Gold standard: 90+", bx + blkW / 2, by + 55, { align: "center" });
+      // SEO framing text — fixed area by+66 to by+92 (26pt zone, same for all gauges)
+      doc.setFontSize(6); tCol("#777777");
+      if (s.seoTip) {
+        const tipWrapped = doc.splitTextToSize(s.seoTip, blkW - 10);
+        const tipTotalH = tipWrapped.length * 8;
+        const tipStartY = by + 66 + (26 - tipTotalH) / 2;
+        tipWrapped.forEach((line: string, li: number) => {
+          doc.text(line, bx + blkW / 2, tipStartY + li * 8, { align: "center" });
+        });
+      }
     });
     y = psStart + psCardH + GAP;
 
@@ -692,7 +730,7 @@ Return ONLY valid JSON:
     doc.setFontSize(9); tCol(MUTED); doc.setFont("helvetica", "normal");
     doc.text("ChatGPT  |  Perplexity  |  Gemini  |  Claude  |  Copilot", M + P + 110, geoInnerY + 16);
     doc.setFontSize(8); tCol(MUTED);
-    doc.text("Industry avg: 52/100    Top competitor: 67/100", M + P + 110, geoInnerY + 26);
+    doc.text("Scored against gold standard AI optimization benchmarks", M + P + 110, geoInnerY + 26);
 
     y = geoStart + geoCardH + GAP;
 
@@ -821,7 +859,7 @@ Return ONLY valid JSON:
     drawGradientBar(M, y, CW, 2);
     y += 14;
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); tCol(MUTED);
-    doc.text("Generated by Conversion Intelligence -- avenuez.com", W / 2, y, { align: "center" });
+    doc.text("Generated by Avenue Z SEO Audit -- avenuez.com", W / 2, y, { align: "center" });
 
     // Add page numbers to all pages
     const totalPages = doc.getNumberOfPages();
@@ -832,7 +870,7 @@ Return ONLY valid JSON:
       doc.text(`Page ${p}`, W - M, H - 24, { align: "right" });
     }
 
-    doc.save(`${siteData.companyName.replace(/[^a-zA-Z0-9]/g, "_")}_Conversion_Intelligence_Report.pdf`);
+    doc.save(`${siteData.companyName.replace(/[^a-zA-Z0-9]/g, "_")}_SEO_Audit_Report.pdf`);
   };
 
   return (
@@ -844,7 +882,7 @@ Return ONLY valid JSON:
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <span className="gt" style={{fontSize:17,fontWeight:900,letterSpacing:"-0.3px"}}>AVENUE Z</span>
             <span style={{color:"#ffffff20"}}>|</span>
-            <span style={{color:"#555",fontSize:12,fontWeight:700,letterSpacing:"0.04em"}}>CONVERSION INTELLIGENCE</span>
+            <span style={{color:"#555",fontSize:12,fontWeight:700,letterSpacing:"0.04em"}}>SEO AUDIT</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             {Object.values(AVENUE_Z.stats).map((v,i)=>(
@@ -980,7 +1018,7 @@ Return ONLY valid JSON:
           {/* CENTER */}
           <div style={{background:"#0d0d0d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{display:"flex",borderBottom:"1px solid #ffffff08",flexShrink:0}}>
-              {["health","links","ai-geo","passed"].map(t=>(
+              {["health","ai-geo","passed"].map(t=>(
                 <button key={t} onClick={()=>setTab(t)}
                   style={{padding:"12px 16px",background:"none",border:"none",borderBottom:tab===t?"2px solid #FFFC60":"2px solid transparent",color:tab===t?"#FFFC60":"#444",fontWeight:700,fontSize:11,cursor:"pointer",textTransform:"uppercase",letterSpacing:"0.08em",transition:"color 0.2s"}}>
                   {t==="health"?"Site Audit":t==="ai-geo"?"AI/GEO":t==="passed"?"What's Working ✓":t.charAt(0).toUpperCase()+t.slice(1)}
@@ -995,23 +1033,23 @@ Return ONLY valid JSON:
                     const cc=[psData.performance<90,psData.accessibility<90,!siteData.hasSchema,siteData.missingAlt>0,!siteData.https,!siteData.mobileResponsive,psData.seo<90,siteData.h1Tags===0,siteData.descriptionLength===0].filter(Boolean).length;
                     const perf=psData.performance;const a11y=psData.accessibility;const seo=psData.seo;const bp=psData.bestPractices;
                     const headline=perf<50&&!siteData.hasSchema
-                      ?"This site is critically slow and invisible to AI search engines — your revenue and reputation are actively at risk."
+                      ?"This site is critically slow and invisible to Google and AI search — your SEO rankings and organic traffic are actively at risk."
                       :perf<50&&siteData.hasSchema
-                      ?"This site loads critically slow — every second of delay is costing you conversions and revenue."
+                      ?"This site loads critically slow — Google penalizes slow sites in search rankings — every second costs you organic traffic and SEO performance."
                       :perf>=50&&!siteData.hasSchema
-                      ?"This site is invisible to ChatGPT, Perplexity, and Google AI — competitors with schema are getting citations you're missing."
+                      ?"This site has no schema markup — Google rich results, ChatGPT, and Perplexity can't surface it. Competitors with schema are outranking you."
                       :perf>=50&&a11y<90
-                      ?"This site fails WCAG AAA accessibility standards — excluding users with disabilities and falling short of the gold standard."
+                      ?"This site fails accessibility standards — poor accessibility hurts user experience signals that Google uses to determine SEO rankings."
                       :perf>=70&&a11y>=70&&seo>=70&&cc>0
-                      ?`This site has ${cc} gaps against the gold standard — here's exactly what's at risk.`
-                      :`This site is performing well against gold standard benchmarks — ${cc} opportunities identified.`;
+                      ?`This site has ${cc} SEO gaps against the gold standard — here's exactly what's hurting your Google rankings.`
+                      :`This site is performing well against SEO gold standards — ${cc} search visibility opportunities identified.`;
                     const subline=!siteData.hasSchema&&perf<90
-                      ?`ChatGPT, Perplexity, and Google AI cannot cite this site — and it loads ${perf}/100 against a gold standard of 90.`
+                      ?`Missing schema means no Google rich results and no AI citations — plus a ${perf}/100 performance score tanks SEO rankings.`
                       :!siteData.hasSchema&&perf>=90
-                      ?"ChatGPT, Perplexity, and Google AI cannot cite this site due to missing schema markup."
+                      ?"No schema markup means Google can't generate rich results and AI engines can't cite this site — a critical SEO gap."
                       :siteData.hasSchema&&perf<50
-                      ?"Site performance is critically below gold standard — every second of delay costs conversions."
-                      :`This site has ${cc} gaps against the gold standard. See exactly what's at risk below.`;
+                      ?"Google's Core Web Vitals are critically below threshold — slow sites get demoted in search rankings and lose organic traffic."
+                      :`This site has ${cc} SEO gaps against the gold standard. See exactly what's hurting your search rankings below.`;
                     const pills:{text:string;color:string}[]=[];
                     if(perf<90)pills.push({text:`Performance: ${perf}/100 — ${90-perf} pts below gold standard`,color:"#FF6060"});
                     if(a11y<90)pills.push({text:`Accessibility: ${a11y}/100 — ${90-a11y} pts below gold standard`,color:"#FF6060"});
@@ -1048,16 +1086,26 @@ Return ONLY valid JSON:
                         {[1,2,3,4].map(i=><div key={i} className="shimmer" style={{width:90,height:110,borderRadius:12}}/>)}
                       </div>
                     ):(
-                      <div style={{display:"flex",justifyContent:"space-evenly",flexWrap:"wrap"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(4, 1fr)",gap:16}}>
                         {[
-                          {key:"performance",label:"Performance"},
-                          {key:"accessibility",label:"Accessibility"},
-                          {key:"bestPractices",label:"Conversion Optimization"},
-                          {key:"seo",label:"SEO"},
+                          {key:"performance",label:"Performance",seoTip:"Fast sites rank higher in Google search results"},
+                          {key:"accessibility",label:"Accessibility",seoTip:"Better accessibility improves user experience signals for SEO"},
+                          {key:"bestPractices",label:"Conversion Optimization",seoTip:"Site usability affects bounce rate — a key SEO ranking factor"},
+                          {key:"seo",label:"SEO",seoTip:""},
                         ].map(g=>(
-                          <div key={g.key} style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                          <div key={g.key} style={{display:"flex",flexDirection:"column",alignItems:"center",minHeight:200}}>
                             <Gauge score={psData?.[g.key]} label={g.label}/>
-                            {psData&&<div style={{color:"#444",fontSize:11,textAlign:"center",marginTop:4}}>Gold standard: 90+</div>}
+                            {psData&&(
+                              <>
+                                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:8}}>
+                                  <span style={{color:"#444",fontSize:11}}>Gold standard: 90+</span>
+                                  <RefIcon tooltip="Google's published excellence threshold" href="https://developers.google.com/speed/docs/insights/v5/about"/>
+                                </div>
+                                <div style={{minHeight:50,display:"flex",alignItems:"center",justifyContent:"center",textAlign:"center",fontSize:10,color:"#777",marginTop:6,padding:"0 8px",lineHeight:1.4}}>
+                                  {g.seoTip||""}
+                                </div>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1078,18 +1126,21 @@ Return ONLY valid JSON:
                   )}
 
                   <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20}}>
-                    <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:14}}>GOLD STANDARD CHECKLIST</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                      <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>GOLD STANDARD CHECKLIST</div>
+                      <span onClick={()=>setShowGoldModal(true)} style={{color:"#555",fontSize:10,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,transition:"color 0.2s"}} onMouseEnter={e=>(e.currentTarget.style.color="#FFFC60")} onMouseLeave={e=>(e.currentTarget.style.color="#555")}><Info size={11}/>How is this scored?</span>
+                    </div>
                     {loading&&!siteData
                       ?[1,2,3,4,5,6,7].map(i=><div key={i} className="shimmer" style={{height:30,borderRadius:8,marginBottom:6}}/>)
                       :siteData?(
                         <>
                           <ChkItem label="Meta Title" passed={siteData.titleLength>0} detail={siteData.titleLength>0?`${siteData.titleLength} chars`:"Missing"} impact="Poor title tags directly limit search rankings and click-through rates" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
                           <ChkItem label="Meta Description" passed={siteData.descriptionLength>0} detail={siteData.descriptionLength>0?`${siteData.descriptionLength} chars`:"Missing"} impact="Missing meta description reduces clicks from search results" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
-                          <ChkItem label="HTTPS Secure" passed={siteData.https} impact="Unsecured sites are penalized by Google and flagged unsafe by browsers" timeEst="est. 1 hr" ctaLabel="Talk to Avenue Z about Web Design →"/>
-                          <ChkItem label="Mobile Responsive" passed={siteData.mobileResponsive} impact="Over 60% of web traffic is mobile — non-responsive sites lose this audience" timeEst="est. 2-4 wks" ctaLabel="Talk to Avenue Z about Web Design →"/>
-                          <ChkItem label="Structured Data (Schema)" passed={siteData.hasSchema} impact="No schema means ChatGPT, Perplexity, and Google AI cannot cite this site" timeEst="est. 4-6 hrs" ctaLabel="Talk to Avenue Z about AEO →"/>
+                          <ChkItem label="HTTPS Secure" passed={siteData.https} impact="No HTTPS = Google SEO penalty — unsecured sites rank lower" timeEst="est. 1 hr" ctaLabel="Talk to Avenue Z about Web Design →"/>
+                          <ChkItem label="Mobile Responsive" passed={siteData.mobileResponsive} impact="Mobile-first indexing: Google prioritizes mobile-responsive sites in rankings" timeEst="est. 2-4 wks" ctaLabel="Talk to Avenue Z about Web Design →"/>
+                          <ChkItem label="Structured Data (Schema)" passed={siteData.hasSchema} impact="Schema markup helps Google understand your content — critical for SEO and AI visibility" timeEst="est. 4-6 hrs" ctaLabel="Talk to Avenue Z about AEO →"/>
                           <ChkItem label="H1 Tag Present" passed={siteData.h1Tags>0} detail={siteData.h1Tags>0?`${siteData.h1Tags} found`:"None"} impact="Missing H1 tag confuses search engines about this page topic" timeEst="est. 15 min" ctaLabel="Talk to Avenue Z about SEO →"/>
-                          <ChkItem label="Image Alt Text" passed={siteData.missingAlt===0} detail={siteData.missingAlt>0?`${siteData.missingAlt} missing`:"All tagged"} impact="Images without alt text are invisible to search engines and screen readers" timeEst="est. 30 min" ctaLabel="Talk to Avenue Z about Content →"/>
+                          <ChkItem label="Image Alt Text" passed={siteData.missingAlt===0} detail={siteData.missingAlt>0?`${siteData.missingAlt} missing`:"All tagged"} impact="Alt text helps images rank in Google Image Search and improves page SEO" timeEst="est. 30 min" ctaLabel="Talk to Avenue Z about Content →"/>
                           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:14}}>
                             <div style={{background:"#1e1e1e",borderRadius:10,padding:14,border:"1px solid #ffffff08"}}>
                               <div style={{color:"#39A0FF",fontSize:22,fontWeight:900}}>{siteData.internalLinks}</div>
@@ -1106,49 +1157,6 @@ Return ONLY valid JSON:
                 </div>
               )}
 
-              {tab==="links"&&(
-                <div className="fi">
-                  <div style={{background:"#141414",border:"1px solid #ffffff0a",borderRadius:14,padding:20}}>
-                    <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:16}}>LINK PROFILE</div>
-                    {siteData?(
-                      <>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
-                          <div style={{background:"#1e1e1e",borderRadius:12,padding:20,textAlign:"center",border:"1px solid #ffffff08"}}>
-                            <div style={{color:"#39A0FF",fontSize:36,fontWeight:900,lineHeight:1}}>{siteData.internalLinks}</div>
-                            <div style={{color:"#666",fontSize:12,marginTop:6,fontWeight:600}}>Internal Links</div>
-                            <div style={{color:"#444",fontSize:11,marginTop:2}}>Same-domain navigation</div>
-                          </div>
-                          <div style={{background:"#1e1e1e",borderRadius:12,padding:20,textAlign:"center",border:"1px solid #ffffff08"}}>
-                            <div style={{color:"#60FDFF",fontSize:36,fontWeight:900,lineHeight:1}}>{siteData.externalLinks}</div>
-                            <div style={{color:"#666",fontSize:12,marginTop:6,fontWeight:600}}>External Links</div>
-                            <div style={{color:"#444",fontSize:11,marginTop:2}}>Outbound references</div>
-                          </div>
-                        </div>
-                        <div style={{background:"#1e1e1e",borderRadius:10,padding:14,border:"1px solid #ffffff08"}}>
-                          <div style={{display:"flex",gap:3,marginBottom:10,height:8,borderRadius:99,overflow:"hidden"}}>
-                            <div style={{flex:siteData.internalLinks||1,background:"#39A0FF",transition:"flex 1s"}}/>
-                            <div style={{flex:siteData.externalLinks||1,background:"#60FDFF",transition:"flex 1s"}}/>
-                          </div>
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#555",fontWeight:600}}>
-                            <span><span style={{color:"#39A0FF"}}>● </span>Internal ({Math.round(siteData.internalLinks/(siteData.internalLinks+siteData.externalLinks||1)*100)}%)</span>
-                            <span><span style={{color:"#60FDFF"}}>● </span>External ({Math.round(siteData.externalLinks/(siteData.internalLinks+siteData.externalLinks||1)*100)}%)</span>
-                          </div>
-                        </div>
-                        {siteData.keyPages?.length>0&&(
-                          <div style={{marginTop:14}}>
-                            <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:10}}>KEY PAGES FOUND</div>
-                            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                              {siteData.keyPages.map((p,i)=>(
-                                <span key={i} style={{background:"#1e1e1e",border:"1px solid #ffffff0a",borderRadius:99,padding:"4px 10px",fontSize:11,color:"#888"}}>{p}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ):<div style={{color:"#333",fontSize:13,textAlign:"center",padding:"40px 0"}}>Run an analysis to see link data</div>}
-                  </div>
-                </div>
-              )}
 
               {tab==="ai-geo"&&(
                 <div className="fi">
@@ -1188,6 +1196,7 @@ Return ONLY valid JSON:
                           <div style={{color:"#555",fontSize:11}}>ChatGPT · Perplexity · Gemini · Claude · Copilot</div>
                           <div style={{color:"#666",fontSize:12,fontStyle:"italic",marginTop:4}}>Scored against gold standard AI optimization benchmarks</div>
                           <div style={{color:"#555",fontSize:11,marginTop:8,lineHeight:1.5,fontStyle:"italic"}}>Scores are data-informed predictions based on real site signals. Not live AI engine queries.</div>
+                          <span onClick={()=>setShowGeoModal(true)} style={{color:"#555",fontSize:10,fontWeight:600,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:4,marginTop:8,transition:"color 0.2s"}} onMouseEnter={e=>(e.currentTarget.style.color="#FFFC60")} onMouseLeave={e=>(e.currentTarget.style.color="#555")}><Info size={11}/>How is this scored?</span>
                         </div>
                       </div>
 
@@ -1273,7 +1282,7 @@ Return ONLY valid JSON:
             {/* Recs — 55% height */}
             <div style={{flex:"0 0 55%",overflowY:"auto",padding:14,borderBottom:"1px solid #ffffff08"}}>
               <div style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em",marginBottom:12,display:"flex",alignItems:"center",gap:6}}>
-                <Zap size={11} color="#FFFC60"/> CONVERSION INTELLIGENCE FEED
+                <Zap size={11} color="#FFFC60"/> SEO AUDIT FEED
               </div>
               {loading&&recs.length===0?(
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1290,7 +1299,7 @@ Return ONLY valid JSON:
                             <Badge severity={rec.severity}/>
                           </div>
                           <div style={{color:"#e0e0e0",fontSize:12,fontWeight:700,lineHeight:1.4}}>{rec.title}</div>
-                          {expandedRec!==i&&<div style={{color:"#888",fontSize:11,lineHeight:1.5,marginTop:4}}>{rec.severity==="critical"?"This is actively costing you traffic and revenue right now.":rec.severity==="warning"?"Competitors without this issue have a measurable advantage over you.":"Fixing this would directly improve your search and AI visibility."}</div>}
+                          {expandedRec!==i&&<div style={{color:"#888",fontSize:11,lineHeight:1.5,marginTop:4}}>{rec.severity==="critical"?"This is actively costing you Google rankings and organic traffic right now.":rec.severity==="warning"?"Competitors with better SEO signals have a measurable search visibility advantage.":"Fixing this would directly improve your Google search rankings and AI visibility."}</div>}
                         </div>
                         {expandedRec===i?<ChevronDown size={14} color="#444" style={{flexShrink:0,marginTop:2}}/>:<ChevronRight size={14} color="#444" style={{flexShrink:0,marginTop:2}}/>}
                       </div>
@@ -1335,7 +1344,7 @@ Return ONLY valid JSON:
             <div style={{flex:"0 0 45%",display:"flex",flexDirection:"column",minHeight:0}}>
               <div style={{padding:"10px 14px",borderBottom:"1px solid #ffffff07",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                 <MessageSquare size={11} color="#39A0FF"/>
-                <span style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>CHAT WITH CONVERSION INTELLIGENCE</span>
+                <span style={{fontSize:9,color:"#444",fontWeight:800,letterSpacing:"0.12em"}}>CHAT WITH SEO STRATEGIST</span>
               </div>
               <div ref={chatRef} style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
                 {chat.length===0&&(
@@ -1396,16 +1405,49 @@ Return ONLY valid JSON:
             <span style={{color:"#fff",fontSize:20,fontWeight:800,marginBottom:8,display:"block"}}>Get Your Full Report</span>
             <span style={{color:"#666",fontSize:13,marginBottom:24,lineHeight:1.5,display:"block"}}>Enter your details to download your free website audit.</span>
             <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>FIRST NAME</div>
-            <input value={gateFirstName} onChange={e=>setGateFirstName(e.target.value)} placeholder="Your first name" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
+            <input value={gateFirstName} onChange={e=>setGateFirstName(e.target.value)} placeholder="First name" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
+            <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>LAST NAME</div>
+            <input value={gateLastName} onChange={e=>setGateLastName(e.target.value)} placeholder="Last name" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
             <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>WORK EMAIL</div>
             <input value={gateEmail} onChange={e=>setGateEmail(e.target.value)} placeholder="your@company.com" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
             <div style={{color:"#888",fontSize:11,fontWeight:700,marginBottom:4}}>COMPANY NAME</div>
             <input value={gateCompany} onChange={e=>setGateCompany(e.target.value)} placeholder="Your company" style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#fff",fontSize:13,width:"100%",marginBottom:14,outline:"none",boxSizing:"border-box"}} onFocus={e=>{e.target.style.borderColor="#60FDFF";e.target.style.boxShadow="0 0 0 2px rgba(96,253,255,0.1)";}} onBlur={e=>{e.target.style.borderColor="rgba(255,255,255,0.1)";e.target.style.boxShadow="none";}}/>
             <div style={{color:"#FF6060",fontSize:11,marginBottom:8,minHeight:16}}>{gateError}</div>
-            <button onClick={()=>{if(!gateFirstName.trim()||!gateEmail.trim()||!gateEmail.includes("@")){setGateError("Please enter your name and a valid email to continue.");return;}generatePDF();setShowPDFGate(false);setGateError("");setGateFirstName("");setGateEmail("");setGateCompany("");}} style={{background:"linear-gradient(135deg,#FFFC60,#60FF80)",color:"#000000",fontWeight:800,fontSize:14,borderRadius:99,padding:"14px 24px",width:"100%",border:"none",cursor:"pointer",marginTop:4,letterSpacing:"0.02em"}}>Download My Report</button>
+            <button onClick={()=>{if(!gateFirstName.trim()||!gateLastName.trim()||!gateEmail.trim()||!gateEmail.includes("@")){setGateError("Please enter your full name and a valid email to continue.");return;}generatePDF();setShowPDFGate(false);setGateError("");setGateFirstName("");setGateLastName("");setGateEmail("");setGateCompany("");}} style={{background:"linear-gradient(135deg,#FFFC60,#60FF80)",color:"#000000",fontWeight:800,fontSize:14,borderRadius:99,padding:"14px 24px",width:"100%",border:"none",cursor:"pointer",marginTop:4,letterSpacing:"0.02em"}}>Download My Report</button>
           </div>
         </div>
       )}
+
+      <ScoringModal open={showGoldModal} onClose={()=>setShowGoldModal(false)} title="HOW IS THIS SCORED?">
+        <p style={{marginTop:0}}>We score against the <strong style={{color:"#FFFC60"}}>highest possible standards</strong>:</p>
+        <ul style={{paddingLeft:18,margin:"12px 0"}}>
+          <li style={{marginBottom:8}}><strong style={{color:"#fff"}}>WCAG AAA</strong> for accessibility</li>
+          <li style={{marginBottom:8}}><strong style={{color:"#fff"}}>Google's Core Web Vitals</strong> thresholds for performance</li>
+          <li style={{marginBottom:8}}><strong style={{color:"#fff"}}>100% optimal schema markup</strong> for structured data</li>
+          <li style={{marginBottom:8}}><strong style={{color:"#fff"}}>Google PageSpeed 90+</strong> as the excellence benchmark</li>
+        </ul>
+        <p style={{marginBottom:0}}>Most sites fall short of these gold standards — that's normal. This report shows you exactly where to improve for maximum impact on conversions and revenue.</p>
+      </ScoringModal>
+
+      <ScoringModal open={showGeoModal} onClose={()=>setShowGeoModal(false)} title="AI/GEO SCORING METHODOLOGY">
+        <p style={{marginTop:0}}>Your AI Search Visibility Score is calculated using a <strong style={{color:"#FFFC60"}}>6-component weighted methodology</strong>:</p>
+        <div style={{display:"flex",flexDirection:"column",gap:10,margin:"14px 0"}}>
+          {[
+            {pts:"20 pts",label:"Structured Data / Schema Markup",desc:"Full schema present, partial, or none"},
+            {pts:"20 pts",label:"Content Structure for AI Retrieval",desc:"FAQs, H2 hierarchy, answer-formatted writing"},
+            {pts:"15 pts",label:"Technical Accessibility",desc:"Mapped from PageSpeed accessibility score"},
+            {pts:"15 pts",label:"Security & Mobile Readiness",desc:"HTTPS (8 pts) + mobile viewport (7 pts)"},
+            {pts:"15 pts",label:"Brand Authority & E-A-T Signals",desc:"Team pages, press, credentials, trust signals"},
+            {pts:"15 pts",label:"Content Depth & Substance",desc:"Enough original content for AI to cite"},
+          ].map((c,i)=>(
+            <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{background:"#1e1e1e",color:"#FFFC60",fontSize:10,fontWeight:800,padding:"3px 8px",borderRadius:6,flexShrink:0,whiteSpace:"nowrap"}}>{c.pts}</span>
+              <div><div style={{color:"#fff",fontSize:12,fontWeight:700}}>{c.label}</div><div style={{color:"#666",fontSize:11}}>{c.desc}</div></div>
+            </div>
+          ))}
+        </div>
+        <p style={{marginBottom:0,color:"#666",fontSize:11}}>Per-engine scores are derived from the overall score, adjusted by up to ±15 points based on each engine's weighting priorities.</p>
+      </ScoringModal>
     </>
   );
 }
