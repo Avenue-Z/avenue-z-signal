@@ -423,6 +423,27 @@ Return ONLY valid JSON:
       log(`> AI/GEO score: ${geo.overallScore}/100`);
       log(`> ✓ Full analysis complete.`);
 
+      // Dispatch to SEO Agent Suite webhook (non-blocking)
+      try {
+        const webhookRes = await fetch('/api/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: u,
+            siteData: sd,
+            psData: ps || recsData.pageSpeed,
+            recommendations: recsData.recommendations || [],
+            geoData: geo
+          })
+        });
+        const webhookData = await webhookRes.json();
+        if (webhookData.sent) {
+          log('> Webhook dispatched to SEO Agent Suite.');
+        }
+      } catch (webhookError) {
+        console.warn('Webhook failed (non-blocking):', webhookError);
+      }
+
     }catch(e){
       log(`> Error: ${e.message}`);
     }
